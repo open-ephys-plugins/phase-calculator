@@ -14,6 +14,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@v1
+    - name: Setup MSBuild.exe
+      uses: warrenbuckley/Setup-MSBuild@v1
     - name: setup
       env: 
         repo: open-ephys-gui
@@ -23,21 +25,30 @@ jobs:
         git clone https://github.com/open-ephys/plugin-GUI.git
         cd plugin-GUI/Build
         cmake -G "Visual Studio 16 2019" -A x64 .. 
+        mkdir shared
         mkdir Release && cd Release
         lib_version=$(curl -s -X GET https://api.bintray.com/packages/open-ephys-gui/Libraries/open-ephys-lib-for-windows/versions/_latest | jq '.name')
         lib_version="${lib_version:1:${#lib_version}-2}"
         curl -L https://dl.bintray.com/open-ephys-gui/Libraries/open-ephys-lib-for-win-${lib_version}.zip --output open-ephys-lib-for-win-${lib_version}.zip 
         unzip open-ephys-lib-for-win-${lib_version}.zip
-        curl -L https://dl.bintray.com/open-ephys-gui-plugins/OpenEphysFFTW/OpenEphysFFTW-windows_0.1.0-API6.zip --output OpenEphysFFTW.zip
-        unzip OpenEphysFFTW.zip
       shell: bash
+    - name: config-fftw
+      run: |
+        cd ../..
+        mkdir OEPlugins && cd OEPlugins
+        git clone https://github.com/open-ephys-plugins/OpenEphysFFTW.git
+        cd OpenEphysFFTW/Build
+        cmake -G "Visual Studio 16 2019" -A x64 ..
+      shell: bash
+    - name: build-fftw
+      run: |
+        msbuild ../../OEPlugins/OpenEphysFFTW/Build/INSTALL.vcxproj -p:Configuration=Release -p:Platform=x64
+      shell: cmd
     - name: configure
       run: |
         cd Build
         cmake -G "Visual Studio 16 2019" -A x64 .. 
       shell: bash
-    - name: Setup MSBuild.exe
-      uses: warrenbuckley/Setup-MSBuild@v1
     - name: build
       run: |
         msbuild Build/INSTALL.vcxproj -p:Configuration=Release -p:Platform=x64
@@ -58,11 +69,6 @@ jobs:
         new_plugin_ver=$tag-API$plugin_api
         mkdir plugins
         cp -v $build_dir/*.dll plugins
-        if [ -d "Resources" ]
-        then
-          mkdir shared
-          cp -v Resources/*.dll shared
-        fi
         zipfile=${package}_${new_plugin_ver}.zip
         powershell Compress-Archive -Path "plugins" -DestinationPath ${zipfile}
         if [ -d "shared" ]

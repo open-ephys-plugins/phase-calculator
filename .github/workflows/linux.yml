@@ -22,10 +22,15 @@ jobs:
         cd ../..
         git clone https://github.com/open-ephys/plugin-GUI.git
         cd plugin-GUI/Build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ..
-        curl -L https://dl.bintray.com/open-ephys-gui-plugins/OpenEphysFFTW/OpenEphysFFTW-linux_0.1.0-API6.zip --output OpenEphysFFTW.zip
-        powershell Expand-Archive OpenEphysFFTW.zip -DestinationPath Release
         cd ../Resources/Scripts
         sudo ./install_linux_dependencies.sh
+        sudo apt-get install libfftw3-dev
+        cd ../../..
+        mkdir OEPlugins && cd OEPlugins
+        git clone https://github.com/open-ephys-plugins/OpenEphysFFTW.git
+        cd OpenEphysFFTW/Build
+        cmake -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=Release ..
+        make install
     - name: build
       run: |
         cd Build
