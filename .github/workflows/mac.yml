@@ -32,7 +32,6 @@ jobs:
         xcodebuild install -configuration Release
         cp ../Source/OpenEphysFFTW.h ../../../plugin-GUI/installed_libs/include
     - name: build
-      if: false
       run: |
         cd Build
         cmake -G "Xcode" -DCMAKE_BUILD_TYPE=Release ..
@@ -40,7 +39,6 @@ jobs:
 #    - name: test
 #      run: cd build && ctest
     - name: deploy
-      if: false
       env:
         bintrayUser: ${{ secrets.bintrayUsername }}
         bintrayApiKey: ${{ secrets.bintrayApiKey }}
