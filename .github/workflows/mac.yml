@@ -28,14 +28,13 @@ jobs:
         cd OEPlugins
         git clone https://github.com/open-ephys-plugins/OpenEphysFFTW.git
         cd OpenEphysFFTW/Build
-        cmake -G 'Xcode' -DCMAKE_BUILD_TYPE=Release ..
-        xcodebuild install -configuration Release
-        cp ../Source/OpenEphysFFTW.h ../../../plugin-GUI/installed_libs/include
+        cmake -G "Xcode" -DCMAKE_BUILD_TYPE=Release ..
+        xcodebuild -scheme install -configuration Release
     - name: build
       run: |
         cd Build
         cmake -G "Xcode" -DCMAKE_BUILD_TYPE=Release ..
-        xcodebuild -configuration Release
+        xcodebuild -scheme install -configuration Release
 #    - name: test
 #      run: cd build && ctest
     - name: deploy
