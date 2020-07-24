@@ -404,7 +404,7 @@ namespace PhaseCalculator
 
         // draw grid
         // spokes and degree labels (every 30 degrees)
-        Point<float> center = plotBounds.getCentre();
+        juce::Point<float> center = plotBounds.getCentre();
         Line<float> spoke(center, center);
         juce::Rectangle<int> textBox(textBoxSize, textBoxSize);
         g.setFont(Font(textBoxSize / 2, Font::bold));
@@ -416,7 +416,7 @@ namespace PhaseCalculator
             g.drawLine(spoke);
 
             float textRadius = (squareSide + textBoxSize) / 2;
-            Point<int> textCenter = center.getPointOnCircumference(textRadius, juceAngle).toInt();
+            juce::Point<int> textCenter = center.getPointOnCircumference(textRadius, juceAngle).toInt();
             int degreeAngle = (450 - 30 * i) % 360;
             g.setColour(Colours::black);
             g.drawFittedText(String(degreeAngle), textBox.withCentre(textCenter), Justification::centred, 1);

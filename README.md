@@ -23,7 +23,7 @@ This plugin must now be built outside of the main GUI file tree using CMake. In 
 
 You should use this branch if you are already using CMake to build the *main GUI* (in development as of writing). Otherwise, use the `master` branch.
 
-You must also first install the "OpenEphysFFTW" common library, available [here](https://github.com/tne-lab/OpenEphysFFTW/tree/cmake-gui).
+You must also first install the "OpenEphysFFTW" common library, available [here](https://github.com/open-ephys-plugins/OpenEphysFFTW).
 
 See `PhaseCalculator/CMAKE_README.txt` and/or the wiki page [here](https://open-ephys.atlassian.net/wiki/spaces/OEW/pages/1259110401/Plugin+CMake+Builds) for build instructions.
 
