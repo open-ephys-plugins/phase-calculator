@@ -4,30 +4,18 @@ A plugin for the [Open Ephys GUI](https://github.com/open-ephys/plugin-GUI) to e
 
 The following article describes the algorithm used by the previous version of this plugin and the closed-loop stimulation pipeline as a whole:
 
-Blackwood, E., Lo, M., Widge, A. S. (2018). Continuous phase estimation for phase-locked neural stimulation using an autoregressive model for signal prediction. 40th International Conference of the IEEE Engineering in Medicine and Biology Society (EMBC), Honolulu, HI, 4736-4739.
+[Blackwood, E., Lo, M., Widge, A. S. (2018). Continuous phase estimation for phase-locked neural stimulation using an autoregressive model for signal prediction. 40th International Conference of the IEEE Engineering in Medicine and Biology Society (EMBC), Honolulu, HI, 4736-4739.](https://pubmed.ncbi.nlm.nih.gov/30441407/)
 
 If you are just using the plugin in your project, you can cite this version of the code using the DOI listed in the header of this file.
 
-<img src="ht_pc.png" width="200" /><img src="ht_pc_menu1.png" width="200"/><img src="ht_pc_menu2.png" width="200"/>
-<img src="PC_vis.png" width="350" />
-
-## Versions
-
-* You are on the `cmake-gui` branch, which uses a [Hilbert transformer](https://www.intechopen.com/books/matlab-a-fundamental-tool-for-scientific-computing-and-engineering-applications-volume-1/digital-fir-hilbert-transformers-fundamentals-and-efficient-design-methods) FIR filter - actually one of several, depending on the frequency band you are filtering to. This is more efficient than the original (published) algorithm since it doesn't require as much AR model-based prediction nor calculating an FFT on each step.
-
-* If you want, you can switch to the `old-version` branch, which uses the Fourier-transform-based [Hilbert transform](https://en.wikipedia.org/wiki/Hilbert_transform) over a sliding window to estimate the analytic signal (from which we derive the phase). We have been testing variants of this algorithm in our lab since mid-2016, and it is now fairly polished, but is somewhat less computationally efficient than the newer version.
+<img src="Resources/ht_pc.png" width="200" /><img src="Resources/ht_pc_menu1.png" width="200"/><img src="Resources/ht_pc_menu2.png" width="200"/>
+<img src="Resources/PC_vis.png" width="350" />
 
 ## Installation
 
-This plugin must now be built outside of the main GUI file tree using CMake. In order to do so, it must be in a sibling directory to plugin-GUI\* and the main GUI must have already been compiled.
+You must first install the "OpenEphysFFTW" common library, available [here](https://github.com/open-ephys-plugins/OpenEphysFFTW).
 
-You should use this branch if you are already using CMake to build the *main GUI* (in development as of writing). Otherwise, use the `master` branch.
-
-You must also first install the "OpenEphysFFTW" common library, available [here](https://github.com/open-ephys-plugins/OpenEphysFFTW).
-
-See `PhaseCalculator/CMAKE_README.txt` and/or the wiki page [here](https://open-ephys.atlassian.net/wiki/spaces/OEW/pages/1259110401/Plugin+CMake+Builds) for build instructions.
-
-\* If you have the GUI built somewhere else, you can specify its location by setting the environment variable `GUI_BASE_DIR` or defining it when calling cmake with the option `-DGUI_BASE_DIR=<location>`.
+See the wiki page [here](https://open-ephys.atlassian.net/wiki/spaces/OEW/pages/1259110401/Plugin+CMake+Builds) for build instructions.
 
 ## Usage
 
