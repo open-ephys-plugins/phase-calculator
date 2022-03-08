@@ -33,38 +33,16 @@ namespace PhaseCalculator
 {
     class Editor
         : public VisualizerEditor
-        , public ComboBox::Listener
-        , public Label::Listener
     {
         friend class RosePlot;  // to access label updating method
     public:
-        Editor(Node* parentNode, bool useDefaultParameterEditors = false);
+        Editor(Node* parentNode);
         ~Editor();
-
-        // implements ComboBox::Listener
-        void comboBoxChanged(ComboBox* comboBoxThatHasChanged) override;
-
-        // implements Label::Listener
-        void labelTextChanged(Label* labelThatHasChanged) override;
-
-        // update display based on current channel
-        void channelChanged(int chan, bool newState) override;
-
-        // enable/disable controls when acquisiton starts/ends
-        void startAcquisition() override;
-        void stopAcquisition() override;
 
         Visualizer* createNewCanvas() override;
 
-        void updateSettings() override;
-
-        void saveCustomParameters(XmlElement* xml) override;
-        void loadCustomParameters(XmlElement* xml) override;
-
-        // display updaters - do not trigger listeners.
-        void refreshLowCut();
-        void refreshHighCut();
-        void refreshVisContinuousChan();
+        void saveVisualizerEditorParameters(XmlElement* xml) override;
+        void loadVisualizerEditorParameters(XmlElement* xml) override;
 
     private:
 
@@ -88,86 +66,6 @@ namespace PhaseCalculator
             istream >> out;
             return !istream.fail();
         }
-
-        /*
-        * Return whether the control contained a valid input between min and max, inclusive.
-        * If so, it is stored in *out and the control is updated with the parsed input.
-        * Otherwise, the control is reset to defaultValue.
-        *
-        * In header to make sure specializations not used in PhaseCalculatorEditor.cpp
-        * are still available to other translation units.
-        */
-        template<typename Ctrl, typename T>
-        static bool updateControl(Ctrl* c, const T min, const T max,
-            const T defaultValue, T& out)
-        {
-            if (readNumber(c->getText(), out))
-            {
-                out = jmax(min, jmin(max, out));
-                c->setText(String(out), dontSendNotification);
-                return true;
-            }
-
-            c->setText(String(defaultValue), dontSendNotification);
-            return false;
-        }
-
-        // keep track of the record status of each "extra" channel
-        // this is all a bit kludgy, but also temporary until creating continuous
-        // channels in non-source processors is officially implemented.
-        class ExtraChanManager : public Button::Listener
-        {
-        public:
-            ExtraChanManager(const Node* processor);
-
-            // keeps recordStatus in sync with extra channel record buttons.
-            void buttonClicked(Button* button) override;
-
-            // adds or removes recordStatus entry for extra chan
-            // corresponding to given input chan.
-            void addExtraChan(int inputChan);
-            void removeExtraChan(int inputChan);
-            void resize(int numExtraChans);
-
-            bool getRecordStatus(int extraChan) const;
-        private:
-            const Node* p;
-            Array<bool> recordStatus;
-        };
-
-        int prevExtraChans;
-        ExtraChanManager extraChanManager;
-
-        ScopedPointer<Label>    bandLabel;
-        ScopedPointer<ComboBox> bandBox;
-
-        ScopedPointer<Label>    lowCutLabel;
-        ScopedPointer<Label>    lowCutEditable;
-        ScopedPointer<Label>    lowCutUnit;
-
-        ScopedPointer<Label>    highCutLabel;
-        ScopedPointer<Label>    highCutEditable;
-        ScopedPointer<Label>    highCutUnit;
-
-        ScopedPointer<Label>    recalcIntervalLabel;
-        ScopedPointer<Label>    recalcIntervalEditable;
-        ScopedPointer<Label>    recalcIntervalUnit;
-
-        ScopedPointer<Label>    arOrderLabel;
-        ScopedPointer<Label>    arOrderEditable;
-
-        ScopedPointer<Label>    outputModeLabel;
-        ScopedPointer<ComboBox> outputModeBox;
-
-        // constants
-        const String freqRangeTooltip = "Each option corresponds internally to a Hilbert transformer " +
-            String("that is optimized for this frequency range. After selecting a range, you can adjust ") +
-            "'low' and 'high' to filter to any passband within this range.";
-        const String recalcIntervalTooltip = "Time to wait between calls to update the autoregressive models";
-        const String arOrderTooltip = "Order of the autoregressive models used to predict future data";
-        const String outputModeTooltip = "Which component of the analytic signal to output. If 'PH+MAG' is selected, " +
-            String("creates a second channel for each enabled input channel and outputs phases ") +
-            "on the original channels and magnitudes on the corresponding new channels.";
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Editor);
     };

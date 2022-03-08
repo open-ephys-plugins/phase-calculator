@@ -127,8 +127,6 @@ namespace PhaseCalculator
         void refresh() override;
         void beginAnimation() override;
         void endAnimation() override;
-        void setParameter(int, float) override;
-        void setParameter(int, int, int, float) override;
 
         void paint(Graphics& g) override;
         void resized() override;
@@ -148,8 +146,8 @@ namespace PhaseCalculator
         // updates countLabel, meanLabel, and stdLabel
         void updateStatLabels();
 
-        void saveVisualizerParameters(XmlElement* xml) override;
-        void loadVisualizerParameters(XmlElement* xml) override;
+        void saveCustomParametersToXml (XmlElement* xml) override;
+        void loadCustomParametersFromXml (XmlElement* xml) override;
 
         // display updaters - do not trigger listeners.
         void displayContinuousChan(int chan);

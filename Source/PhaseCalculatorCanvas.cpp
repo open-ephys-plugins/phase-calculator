@@ -180,49 +180,49 @@ namespace PhaseCalculator
 
     void Canvas::update()
     {
-        // update continuous channel ComboBox to include only active inputs
-        Array<int> activeInputs = processor->getActiveInputs();
-        int numActiveInputs = activeInputs.size();
-        int numItems = cChannelBox->getNumItems();
-        int currSelectedId = cChannelBox->getSelectedId();
+        // // update continuous channel ComboBox to include only active inputs
+        // Array<int> activeInputs = processor->getActiveInputs();
+        // int numActiveInputs = activeInputs.size();
+        // int numItems = cChannelBox->getNumItems();
+        // int currSelectedId = cChannelBox->getSelectedId();
 
-        // check whether box needs to be cleared - iterate through existing items and check for correctness
-        int startInd = numItems;
-        for (int i = 0; i < numItems; ++i)
-        {
-            if (i >= numActiveInputs ||                           // more items than active inputs
-                cChannelBox->getItemId(i) - 1 != activeInputs[i]) // this item doesn't match what it should be
-            {
-                startInd = 0;
-                cChannelBox->clear(dontSendNotification);
-            }
-        }
+        // // check whether box needs to be cleared - iterate through existing items and check for correctness
+        // int startInd = numItems;
+        // for (int i = 0; i < numItems; ++i)
+        // {
+        //     if (i >= numActiveInputs ||                           // more items than active inputs
+        //         cChannelBox->getItemId(i) - 1 != activeInputs[i]) // this item doesn't match what it should be
+        //     {
+        //         startInd = 0;
+        //         cChannelBox->clear(dontSendNotification);
+        //     }
+        // }
 
-        for (int activeChan = startInd; activeChan < numActiveInputs; ++activeChan)
-        {
-            int chan = activeInputs[activeChan];
+        // for (int activeChan = startInd; activeChan < numActiveInputs; ++activeChan)
+        // {
+        //     int chan = activeInputs[activeChan];
 
-            int id = chan + 1;
-            cChannelBox->addItem(String(id), id);
-            if (id == currSelectedId)
-            {
-                cChannelBox->setSelectedId(id, dontSendNotification);
-            }
-        }
+        //     int id = chan + 1;
+        //     cChannelBox->addItem(String(id), id);
+        //     if (id == currSelectedId)
+        //     {
+        //         cChannelBox->setSelectedId(id, dontSendNotification);
+        //     }
+        // }
 
-        if (cChannelBox->getNumItems() > 0 && cChannelBox->getSelectedId() == 0)
-        {
-            int firstChannelId = activeInputs[0] + 1;
-            cChannelBox->setSelectedId(firstChannelId, dontSendNotification);
-        }
+        // if (cChannelBox->getNumItems() > 0 && cChannelBox->getSelectedId() == 0)
+        // {
+        //     int firstChannelId = activeInputs[0] + 1;
+        //     cChannelBox->setSelectedId(firstChannelId, dontSendNotification);
+        // }
 
-        // if channel changed, notify processor of update
-        // subtract 1 to change from 1-based to 0-based
-        int newId = cChannelBox->getSelectedId();
-        if (newId != currSelectedId)
-        {
-            processor->setParameter(VIS_C_CHAN, static_cast<float>(newId - 1));
-        }
+        // // if channel changed, notify processor of update
+        // // subtract 1 to change from 1-based to 0-based
+        // int newId = cChannelBox->getSelectedId();
+        // if (newId != currSelectedId)
+        // {
+        //     processor->setParameter(VIS_C_CHAN, static_cast<float>(newId - 1));
+        // }
     }
 
     void Canvas::refresh()
@@ -251,21 +251,21 @@ namespace PhaseCalculator
         // this is necessary to maintain the correct source subprocessor metadata on the
         // visualized phase event channel, to avoid problems with the LFP viewer.
         // (shouldn't cause issues unless the setup is pretty weird)
-        int selectedId = cChannelBox->getSelectedId();
-        if (selectedId > 0)
-        {
-            int currSourceSubproc = processor->getFullSourceId(selectedId - 1);
+        // int selectedId = cChannelBox->getSelectedId();
+        // if (selectedId > 0)
+        // {
+        //     int currSourceSubproc = processor->getFullSourceId(selectedId - 1);
 
-            int numItems = cChannelBox->getNumItems();
-            for (int i = 0; i < numItems; ++i)
-            {
-                int id = cChannelBox->getItemId(i);
-                if (id != selectedId && processor->getFullSourceId(id - 1) != currSourceSubproc)
-                {
-                    cChannelBox->setItemEnabled(id, false);
-                }
-            }
-        }
+        //     int numItems = cChannelBox->getNumItems();
+        //     for (int i = 0; i < numItems; ++i)
+        //     {
+        //         int id = cChannelBox->getItemId(i);
+        //         if (id != selectedId && processor->getFullSourceId(id - 1) != currSourceSubproc)
+        //         {
+        //             cChannelBox->setItemEnabled(id, false);
+        //         }
+        //     }
+        // }
 
         startCallbacks();
     }
@@ -281,9 +281,6 @@ namespace PhaseCalculator
 
         stopCallbacks();
     }
-
-    void Canvas::setParameter(int, float) {}
-    void Canvas::setParameter(int, int, int, float) {}
 
     void Canvas::addAngle(double newAngle)
     {
@@ -340,7 +337,7 @@ namespace PhaseCalculator
         stdLabel->setText(String::formatted(stdFmt, stddev), dontSendNotification);
     }
 
-    void Canvas::saveVisualizerParameters(XmlElement* xml)
+    void Canvas::saveCustomParametersToXml(XmlElement* xml)
     {
         XmlElement* visValues = xml->createNewChildElement("VISUALIZER");
         visValues->setAttribute("eventChannelId", eChannelBox->getSelectedId());
@@ -348,7 +345,7 @@ namespace PhaseCalculator
         visValues->setAttribute("phaseRef", referenceEditable->getText());
     }
 
-    void Canvas::loadVisualizerParameters(XmlElement* xml)
+    void Canvas::loadCustomParametersFromXml(XmlElement* xml)
     {
         forEachXmlChildElementWithTagName(*xml, xmlNode, "VISUALIZER")
         {
@@ -543,10 +540,10 @@ namespace PhaseCalculator
         {
             double doubleInput;
             double currReferenceDeg = radiansToDegrees(referenceAngle);
-            bool valid = Editor::updateControl(labelThatHasChanged,
-                -DBL_MAX, DBL_MAX, currReferenceDeg, doubleInput);
+            // bool valid = Editor::updateControl(labelThatHasChanged,
+                // -DBL_MAX, DBL_MAX, currReferenceDeg, doubleInput);
 
-            if (valid)
+            if (true)
             {
                 // convert to radians
                 double newReference = Node::circDist(degreesToRadians(doubleInput), 0.0);
