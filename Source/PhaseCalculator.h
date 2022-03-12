@@ -150,7 +150,7 @@ namespace PhaseCalculator
 
     struct ChannelInfo
     {
-        ChannelInfo(const DataStream* ds, int i);
+        ChannelInfo(DataStream* ds, int i);
 
         void update();
 
@@ -171,7 +171,7 @@ namespace PhaseCalculator
 
         // info for ongoing phase calculation - null if non-active.
         ScopedPointer<ActiveChannelInfo> acInfo;
-        const DataStream* stream;
+        DataStream* stream;
 
     private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ChannelInfo);
@@ -249,14 +249,18 @@ namespace PhaseCalculator
         // order of the AR model
         int arOrder;
 
-        OutputMode outputMode;
-
         // frequency band (determines which Hilbert transformer to use)
         Band band;
 
         // filter passband
         float highCut;
         float lowCut;
+
+        // event channel to watch for phases to plot on the canvas (-1 = none)
+        int visEventChannel;
+
+        // channel to calculate phases from at received stim event times
+        int visContinuousChannel;
 
         Array<double> predSamps;
         Array<double> htTempState;
@@ -295,6 +299,9 @@ namespace PhaseCalculator
         // reads from the visPhaseBuffer if it can acquire a TryLock. returns true if successful.
         bool tryToReadVisPhases(std::queue<double>& other);
 
+        // Returns array of active channels that only includes inputs (not extra outputs)
+        Array<int> getActiveChannels();
+
         // for visualizer continuous channel
         // void saveCustomChannelParametersToXml(XmlElement* channelElement, int channelNumber, InfoObjectCommon::InfoObjectType channelType) override;
         // void loadCustomChannelParametersFromXml(XmlElement* channelElement, InfoObjectCommon::InfoObjectType channelType) override;
@@ -323,11 +330,11 @@ namespace PhaseCalculator
         void updateSubProcessorMap();
 
         // Create an extra output channel for each processed input channel if PH_AND_MAG is selected
-        void updateExtraChannels(uint16 streamId);
+        // void updateExtraChannels(uint16 streamId);
 
         // Calls deselectChannel on each channel that is not currently an input. Only relevant
         // when the output mode is phase and magnitude.
-        void deselectAllExtraChannels(uint16 streamId);
+        // void deselectAllExtraChannels(uint16 streamId);
 
         /*
         * Check the visualization timestamp queue, clear any that are expired
@@ -359,12 +366,6 @@ namespace PhaseCalculator
         // Execute the hilbert transformer on one sample and update the state.
         static double htFilterSamp(double input, Band band, Array<double>& state);
 
-        // event channel to watch for phases to plot on the canvas (-1 = none)
-        int visEventChannel;
-
-        // channel to calculate phases from at received stim event times
-        int visContinuousChannel;
-
         // ---- internals -------
 
         StreamSettings<Settings> settings;
@@ -388,7 +389,7 @@ namespace PhaseCalculator
         CriticalSection visPhaseBufferCS;  // avoid race conditions when updating visualizer
 
         // event channel to send visualized phases over
-        EventChannel* visPhaseChannel;
+        // EventChannel* visPhaseChannel;
 
         /** Only one stream can be monitored at a time*/
         uint16 selectedStream;

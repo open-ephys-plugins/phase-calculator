@@ -67,7 +67,7 @@ namespace PhaseCalculator
         {
             eChannelBox->addItem(String(chan), chan + 1);
         }
-        eChannelBox->setSelectedId(1);
+        eChannelBox->setSelectedId(1, dontSendNotification);
         eChannelBox->addListener(this);
         rosePlotOptions->addAndMakeVisible(eChannelBox);
 
@@ -180,49 +180,49 @@ namespace PhaseCalculator
 
     void Canvas::update()
     {
-        // // update continuous channel ComboBox to include only active inputs
-        // Array<int> activeInputs = processor->getActiveInputs();
-        // int numActiveInputs = activeInputs.size();
-        // int numItems = cChannelBox->getNumItems();
-        // int currSelectedId = cChannelBox->getSelectedId();
+        // update continuous channel ComboBox to include only active inputs
+        Array<int> activeInputs = processor->getActiveChannels();
+        int numActiveInputs = activeInputs.size();
+        int numItems = cChannelBox->getNumItems();
+        int currSelectedId = cChannelBox->getSelectedId();
 
-        // // check whether box needs to be cleared - iterate through existing items and check for correctness
-        // int startInd = numItems;
-        // for (int i = 0; i < numItems; ++i)
-        // {
-        //     if (i >= numActiveInputs ||                           // more items than active inputs
-        //         cChannelBox->getItemId(i) - 1 != activeInputs[i]) // this item doesn't match what it should be
-        //     {
-        //         startInd = 0;
-        //         cChannelBox->clear(dontSendNotification);
-        //     }
-        // }
+        // check whether box needs to be cleared - iterate through existing items and check for correctness
+        int startInd = numItems;
+        for (int i = 0; i < numItems; ++i)
+        {
+            if (i >= numActiveInputs ||                           // more items than active inputs
+                cChannelBox->getItemId(i) - 1 != activeInputs[i]) // this item doesn't match what it should be
+            {
+                startInd = 0;
+                cChannelBox->clear(dontSendNotification);
+            }
+        }
 
-        // for (int activeChan = startInd; activeChan < numActiveInputs; ++activeChan)
-        // {
-        //     int chan = activeInputs[activeChan];
+        for (int activeChan = startInd; activeChan < numActiveInputs; ++activeChan)
+        {
+            int chan = activeInputs[activeChan];
 
-        //     int id = chan + 1;
-        //     cChannelBox->addItem(String(id), id);
-        //     if (id == currSelectedId)
-        //     {
-        //         cChannelBox->setSelectedId(id, dontSendNotification);
-        //     }
-        // }
+            int id = chan + 1;
+            cChannelBox->addItem(String(id), id);
+            if (id == currSelectedId)
+            {
+                cChannelBox->setSelectedId(id, dontSendNotification);
+            }
+        }
 
-        // if (cChannelBox->getNumItems() > 0 && cChannelBox->getSelectedId() == 0)
-        // {
-        //     int firstChannelId = activeInputs[0] + 1;
-        //     cChannelBox->setSelectedId(firstChannelId, dontSendNotification);
-        // }
+        if (cChannelBox->getNumItems() > 0 && cChannelBox->getSelectedId() == 0)
+        {
+            int firstChannelId = activeInputs[0] + 1;
+            cChannelBox->setSelectedId(firstChannelId, dontSendNotification);
+        }
 
-        // // if channel changed, notify processor of update
-        // // subtract 1 to change from 1-based to 0-based
-        // int newId = cChannelBox->getSelectedId();
-        // if (newId != currSelectedId)
-        // {
-        //     processor->setParameter(VIS_C_CHAN, static_cast<float>(newId - 1));
-        // }
+        // if channel changed, notify processor of update
+        // subtract 1 to change from 1-based to 0-based
+        int newId = cChannelBox->getSelectedId();
+        if (newId != currSelectedId)
+        {
+            processor->getParameter("vis_cont")->setNextValue(newId - 1);
+        }
     }
 
     void Canvas::refresh()
@@ -299,14 +299,14 @@ namespace PhaseCalculator
         if (comboBoxThatHasChanged == cChannelBox)
         {
             // subtract 1 to change from 1-based to 0-based
-            float newValue = static_cast<float>(cChannelBox->getSelectedId() - 1);
-            processor->setParameter(VIS_C_CHAN, newValue);
+            int newValue = cChannelBox->getSelectedId() - 1;
+            processor->getParameter("vis_cont")->setNextValue(newValue);
         }
         else if (comboBoxThatHasChanged == eChannelBox)
         {
             // subtract 2, since index 1 == no channel (-1)
-            float newValue = static_cast<float>(eChannelBox->getSelectedId() - 2);
-            processor->setParameter(VIS_E_CHAN, newValue);
+            int newValue = eChannelBox->getSelectedId() - 1;
+            processor->getParameter("vis_event")->setNextValue(newValue);
         }
     }
 
@@ -332,9 +332,9 @@ namespace PhaseCalculator
         double mean = std::round(100 * rosePlot->getCircMean()) / 100;
         double stddev = std::round(100 * rosePlot->getCircStd()) / 100;
 
-        countLabel->setText(String::formatted(countFmt, numAngles), dontSendNotification);
-        meanLabel->setText(String::formatted(meanFmt, mean), dontSendNotification);
-        stdLabel->setText(String::formatted(stdFmt, stddev), dontSendNotification);
+        countLabel->setText("Events received: " + String(numAngles), dontSendNotification);
+        meanLabel->setText("Mean phase (vs. reference): " + String(mean) + "\u00b0", dontSendNotification);
+        stdLabel->setText("Standard deviation phase: " + String(stddev) + "\u00b0", dontSendNotification);
     }
 
     void Canvas::saveCustomParametersToXml(XmlElement* xml)

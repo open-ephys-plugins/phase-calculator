@@ -137,11 +137,11 @@ namespace PhaseCalculator
 
     void ActiveChannelInfo::update()
     {
-        const DataStream* ds = chanInfo.stream;
+        DataStream* ds = chanInfo.stream;
         int arOrder = ds->getParameter("ar_order")->getValue();
         float highCut = ds->getParameter("high_cut")->getValue();
         float lowCut = ds->getParameter("low_cut")->getValue();
-        Band band = (Band)static_cast<CategoricalParameter*>(ds->getParameter("freq_band"))->getSelectedIndex();
+        Band band = (Band)static_cast<CategoricalParameter*>(ds->getParameter("freq_range"))->getSelectedIndex();
 
         // update length of history based on sample rate
         // the history buffer should have enough samples to calculate phases for the viusalizer
@@ -188,7 +188,7 @@ namespace PhaseCalculator
     }
 
 
-    ChannelInfo::ChannelInfo(const DataStream* ds, int i)
+    ChannelInfo::ChannelInfo(DataStream* ds, int i)
         : chan          (i)
         , sampleRate    (0)
         , dsFactor      (0)
@@ -200,7 +200,7 @@ namespace PhaseCalculator
 
     void ChannelInfo::update()
     {
-        const ContinuousChannel* contChannel = stream->getContinuousChannels()[chan]; 
+        ContinuousChannel* contChannel = stream->getContinuousChannels().getUnchecked(chan); 
         if (contChannel == nullptr)
         {
             jassertfalse;
@@ -253,7 +253,8 @@ namespace PhaseCalculator
     Settings::Settings():
         calcInterval(50),
         arOrder(20),
-        outputMode(PH)
+        visContinuousChannel(-1),
+        visEventChannel(-1)
     {
 
     }
@@ -318,7 +319,7 @@ namespace PhaseCalculator
             return false;
         }
 
-        jassert(!channelInfo[chan]->isActive()); // this shouldn't be called if it's already active.
+        //jassert(!channelInfo[chan]->isActive()); // this shouldn't be called if it's already active.
 
         return channelInfo[chan]->activate();
     }
@@ -331,7 +332,7 @@ namespace PhaseCalculator
             return;
         }
 
-        jassert(channelInfo.getUnchecked(chan)->isActive());
+        //jassert(channelInfo.getUnchecked(chan)->isActive());
         channelInfo.getUnchecked(chan)->deactivate();
     }
 
@@ -469,17 +470,17 @@ namespace PhaseCalculator
     Node::Node()
         : GenericProcessor("Phase Calculator")
         , Thread("AR Modeler")
-        , visEventChannel(-1)
-        , visContinuousChannel(-1)
     {
         setProcessorType(Plugin::Processor::FILTER);
+
+        selectedStream = 0;
 
         StringArray bands;
         for (int b = 0; b < NUM_BANDS; ++b)
             bands.add(Hilbert::bandName[b]);
 
         addCategoricalParameter(Parameter::STREAM_SCOPE, 
-                                "freq_band", 
+                                "freq_range", 
                                 "Each option corresponds internally to a Hilbert transformer that is optimized for this frequency range."
                                 + String("After selecting a range, you can adjust ") +
                                 "'low' and 'high' to filter to any passband within this range.",
@@ -487,29 +488,22 @@ namespace PhaseCalculator
                                 );
         String desc;
 
-        addIntParameter(Parameter::STREAM_SCOPE, "low_cut", "Low Cut", 50, 0, 1000, true);
+        const Array<float>& defaultBand = Hilbert::defaultBand[0];
         
-        addIntParameter(Parameter::STREAM_SCOPE, "high_cut", "High Cut", 20, 0, 1000, true);
+        addIntParameter(Parameter::STREAM_SCOPE, "low_cut", "Low Cut", (int)defaultBand[0], 0, 1000, true);
+        
+        addIntParameter(Parameter::STREAM_SCOPE, "high_cut", "High Cut", (int)defaultBand[1], 0, 1000, true);
         
         desc = "Time to wait between calls to update the autoregressive models"; 
-        addIntParameter(Parameter::STREAM_SCOPE, "recalc_ar", desc, 50, 0, 10000, true);
+        addIntParameter(Parameter::STREAM_SCOPE, "ar_refresh", desc, 50, 0, 10000, true);
         
         desc = "Order of the autoregressive models used to predict future data";
         addIntParameter(Parameter::STREAM_SCOPE, "ar_order", desc, 20, 1, 1000, true);
-
-        addCategoricalParameter(Parameter::STREAM_SCOPE, 
-                                "output_mode", 
-                                "Which component of the analytic signal to output. If 'PH+MAG' is selected, " +
-                                String("creates a second channel for each enabled input channel and outputs phases ") +
-                                "on the original channels and magnitudes on the corresponding new channels.",
-                                {"PHASE",
-                                 "MAG",
-                                 "PH+MAG",
-                                 "IMAG"
-                                }, 0, true 
-                                );
         
         addSelectedChannelsParameter(Parameter::STREAM_SCOPE, "Channels", "Selectable Channels", std::numeric_limits<int>::max(), true);
+
+        addIntParameter(Parameter::STREAM_SCOPE, "vis_cont", "Phase calculation channel", -1, 0, 1000, true);
+        addIntParameter(Parameter::STREAM_SCOPE, "vis_event", "Event channel to plot phases", -1, 0, 1000, true);
     }
 
     Node::~Node() {}
@@ -527,68 +521,12 @@ namespace PhaseCalculator
     }
 
 
-    // void Node::setParameter(int parameterIndex, float newValue)
-    // {
-    //     switch (parameterIndex) {
-    //     case RECALC_INTERVAL:
-    //         calcInterval = int(newValue);
-    //         break;
-
-    //     case AR_ORDER:
-    //         arOrder = int(newValue);
-    //         updateActiveChannels();
-    //         break;
-
-    //     case BAND:
-    //         setBand(Band(int(newValue)));
-    //         break;
-
-    //     case LOWCUT:
-    //         setLowCut(newValue);
-    //         break;
-
-    //     case HIGHCUT:
-    //         setHighCut(newValue);
-    //         break;
-
-    //     case OUTPUT_MODE:
-    //     {
-    //         OutputMode oldMode = outputMode;
-    //         outputMode = OutputMode(int(newValue));
-    //         if (oldMode == PH_AND_MAG || outputMode == PH_AND_MAG)
-    //         {
-    //             CoreServices::updateSignalChain(editor.get());  // add or remove channels if necessary
-    //         }
-    //         break;
-    //     }
-
-    //     case VIS_E_CHAN:
-    //         jassert(newValue >= -1);
-    //         visEventChannel = int(newValue);
-    //         break;
-
-    //     case VIS_C_CHAN:
-    //         setVisContChan(int(newValue));
-    //         break;
-    //     }
-    // }
-
     void Node::process(AudioSampleBuffer& buffer)
     {
-        // handle subprocessors, if any
-        // HashMap<int, uint16>::Iterator subProcIt(subProcessorMap);
-        // while (subProcIt.next())
-        // {
-        //     uint32 fullSourceID = uint32(subProcIt.getKey());
-        //     int subProcessor = subProcIt.getValue();
-        //     uint64 sourceTimestamp = getSourceTimestamp(fullSourceID);
-        //     uint32 sourceSamples = getNumSourceSamples(fullSourceID);
-        //     setTimestampAndSamples(sourceTimestamp, sourceSamples, subProcessor);
-        // }
 
         // check for events to visualize
         bool hasCanvas = static_cast<Editor*>(getEditor())->canvas != nullptr;
-        if (hasCanvas && visEventChannel > -1)
+        if (hasCanvas && settings[selectedStream]->visEventChannel > -1)
         {
             checkForEvents();
         }
@@ -596,7 +534,8 @@ namespace PhaseCalculator
         for (auto stream : dataStreams)
         {
             
-            if ((*stream)["enable_stream"])
+            if ((*stream)["enable_stream"]
+                && stream->getStreamId() == selectedStream)
             {
                 // iterate over active input channels
                 Array<int> activeChans = settings[stream->getStreamId()]->getActiveInputs();
@@ -680,30 +619,11 @@ namespace PhaseCalculator
 
                         // output with upsampling (interpolation)
                         float* wpOut = buffer.getWritePointer(chan);
-                        float* wpOut2;
-                        if (settings[stream->getStreamId()]->outputMode == PH_AND_MAG)
-                        {
-                            // second output channel
-                            int outChan2 = getNumInputs() + ac;
-                            jassert(outChan2 < buffer.getNumChannels());
-                            wpOut2 = buffer.getWritePointer(outChan2);
-                        }
 
                         double nextComputedPhase, phaseStep;
-                        double nextComputedMag, magStep;
-                        bool needPhase = settings[stream->getStreamId()]->outputMode != MAG;
-                        bool needMag = settings[stream->getStreamId()]->outputMode != PH;
 
-                        if (needPhase)
-                        {
-                            nextComputedPhase = std::arg(htOutput[0]);
-                            phaseStep = circDist(nextComputedPhase, acInfo->lastComputedPhase, Dsp::doublePi) / stride;
-                        }
-                        if (needMag)
-                        {
-                            nextComputedMag = std::abs(htOutput[0]);
-                            magStep = (nextComputedMag - acInfo->lastComputedMag) / stride;
-                        }
+                        nextComputedPhase = std::arg(htOutput[0]);
+                        phaseStep = circDist(nextComputedPhase, acInfo->lastComputedPhase, Dsp::doublePi) / stride;
 
                         for (int i = 0, frame = 0; i < nSamples; ++i, --acInfo->interpCountdown)
                         {
@@ -713,58 +633,21 @@ namespace PhaseCalculator
                                 ++frame;
                                 acInfo->interpCountdown = stride;
 
-                                if (needPhase)
-                                {
-                                    acInfo->lastComputedPhase = nextComputedPhase;
-                                    nextComputedPhase = std::arg(htOutput[frame]);
-                                    phaseStep = circDist(nextComputedPhase, acInfo->lastComputedPhase, Dsp::doublePi) / stride;
-                                }
-                                if (needMag)
-                                {
-                                    acInfo->lastComputedMag = nextComputedMag;
-                                    nextComputedMag = std::abs(htOutput[frame]);
-                                    magStep = (nextComputedMag - acInfo->lastComputedMag) / stride;
-                                }
+                                acInfo->lastComputedPhase = nextComputedPhase;
+                                nextComputedPhase = std::arg(htOutput[frame]);
+
                             }
 
                             double thisPhase, thisMag;
-                            if (needPhase)
-                            {
-                                thisPhase = circDist(nextComputedPhase, phaseStep * acInfo->interpCountdown, Dsp::doublePi);
-                            }
-                            if (needMag)
-                            {
-                                thisMag = nextComputedMag - magStep * acInfo->interpCountdown;
-                            }
+                            thisPhase = circDist(nextComputedPhase, phaseStep * acInfo->interpCountdown, Dsp::doublePi);
+                            wpOut[i] = float(thisPhase * (180.0 / Dsp::doublePi));
 
-                            switch (settings[stream->getStreamId()]->outputMode)
-                            {
-                            case MAG:
-                                wpOut[i] = float(thisMag);
-                                break;
-
-                            case PH_AND_MAG:
-                                wpOut2[i] = float(thisMag);
-                                // fall through
-                            case PH:
-                                // output in degrees
-                                wpOut[i] = float(thisPhase * (180.0 / Dsp::doublePi));
-                                break;
-
-                            case IM:
-                                wpOut[i] = float(thisMag * std::sin(thisPhase));
-                                break;
-                            }
                         }
 
                         // unwrapping / smoothing
-                        if (settings[stream->getStreamId()]->outputMode == PH ||
-                            settings[stream->getStreamId()]->outputMode == PH_AND_MAG)
-                        {
-                            unwrapBuffer(wpOut, nSamples, acInfo->lastPhase);
-                            smoothBuffer(wpOut, nSamples, acInfo->lastPhase);
-                            acInfo->lastPhase = wpOut[nSamples - 1];
-                        }
+                        unwrapBuffer(wpOut, nSamples, acInfo->lastPhase);
+                        smoothBuffer(wpOut, nSamples, acInfo->lastPhase);
+                        acInfo->lastPhase = wpOut[nSamples - 1];
                     }
                     else // fifo not full or AR model not ready
                     {
@@ -773,7 +656,7 @@ namespace PhaseCalculator
                     }
 
                     // if this is the monitored channel for events, check whether we can add a new phase
-                    if (hasCanvas && chan == visContinuousChannel && acInfo->history.isFull())
+                    if (hasCanvas && chan == settings[stream->getStreamId()]->visContinuousChannel && acInfo->history.isFull())
                     {
                         calcVisPhases(acInfo, getTimestamp(chan) + getNumSamples(chan));
                     }
@@ -886,6 +769,8 @@ namespace PhaseCalculator
 
         for (auto stream : getDataStreams())
         {
+            parameterValueChanged(stream->getParameter("freq_range"));
+
             // update arrays that store one entry per input
             auto cInfo = &settings[stream->getStreamId()]->channelInfo;
             int numInputs = stream->getChannelCount();
@@ -896,58 +781,37 @@ namespace PhaseCalculator
 
             settings[stream->getStreamId()]->updateAllChannels();
 
+            Array<var>* activeChannels = stream->getParameter("Channels")->getValue().getArray();
+        
+            if (activeChannels->size() > 0)
+            {
+                selectedStream = stream->getStreamId();
+            }
+
+
             for (int i = prevNumInputs; i < numInputs; ++i)
             {
-                cInfo->add(new ChannelInfo(stream, i));
+                cInfo->add(new ChannelInfo(getDataStream(stream->getStreamId()), i));
             }
             
-            const ContinuousChannel* visChannel = getContinuousChannel(visContinuousChannel);
-
-            if (!visChannel)
-            {
-                visPhaseChannel = nullptr;
-                return;
-            }
-
-            float sampleRate = visChannel->getSampleRate();
-            
-            EventChannel::Settings s{
-                EventChannel::Type::CUSTOM,
-                "PC visualized phase (deg.)",
-                "The accurate phase in degrees of each visualized event",
-                "phasecalc.visphase",
-                getDataStream(stream->getStreamId()),
-                8,
-                EventChannel::BinaryDataType::DOUBLE_ARRAY,
-                1
-            };
-
-            eventChannels.add(new EventChannel(s));
-            eventChannels.getLast()->addProcessor(processorInfo.get());
-
-            updateExtraChannels(stream->getStreamId());
-
-            if (settings[stream->getStreamId()]->outputMode == PH_AND_MAG)
-            {
-                // keep previously selected input channels from becoming selected extra channels
-                deselectAllExtraChannels(stream->getStreamId());
-            }
         }
+
+        if(selectedStream == 0)
+            selectedStream = getDataStreams()[0]->getStreamId();
     }
 
 
     void Node::parameterValueChanged(Parameter* param)
     {
-        LOGD("Phase Calculator: Value changed for ", param->getName(), ": ", (int)param->getValue());
-
-        
+        LOGC("Phase Calculator: Value changed for ", param->getName(), ": ", (int)param->getValue());
 
         if (param->getName().equalsIgnoreCase("Channels"))
         {
+            selectedStream = param->getStreamId();
             
             auto paramValue = static_cast<SelectedChannelsParameter*>(param)->getValue();
 
-            for (int i = 0; i < getNumOutputsForStream(param->getStreamId()); i++)
+            for (int i = 0; i < getDataStream(param->getStreamId())->getChannelCount(); i++)
             {
                 // mark channel as activated or deactivated
                 if (paramValue.getArray()->contains(i))
@@ -955,6 +819,7 @@ namespace PhaseCalculator
                     // check whether channel can be activated
                     if (!settings[param->getStreamId()]->activateInputChannel(i))
                     {
+                        LOGD("Failed to activate input channel ", i);
                         paramValue.getArray()->remove(i);
                         param->setNextValue(paramValue);
                         continue;
@@ -965,13 +830,15 @@ namespace PhaseCalculator
                     settings[param->getStreamId()]->deactivateInputChannel(i);
                 }
             }
+
+            getEditor()->updateVisualizer();
             
         }
-        else if(param->getName().equalsIgnoreCase("freq_band"))
+        else if(param->getName().equalsIgnoreCase("freq_range"))
         {
-            settings[param->getStreamId()]->setBand(Band(int(static_cast<CategoricalParameter*>(param)->getSelectedIndex())));
+            settings[param->getStreamId()]->setBand(Band(int(static_cast<CategoricalParameter*>(param)->getSelectedIndex())), true);
         }
-        else if(param->getName().equalsIgnoreCase("recalc_ar"))
+        else if(param->getName().equalsIgnoreCase("ar_refresh"))
         {
             settings[param->getStreamId()]->calcInterval = param->getValue();
         }
@@ -982,30 +849,24 @@ namespace PhaseCalculator
         }
         else if(param->getName().equalsIgnoreCase("low_cut"))
         {
-            settings[param->getStreamId()]->lowCut = param->getValue();
-        }
-        else if(param->getName().equalsIgnoreCase("low_cut"))
-        {
             settings[param->getStreamId()]->setLowCut(param->getValue());
         }
         else if(param->getName().equalsIgnoreCase("high_cut"))
         {
             settings[param->getStreamId()]->setHighCut(param->getValue());
         }
-        else if(param->getName().equalsIgnoreCase("output_mode"))
+        else if(param->getName().equalsIgnoreCase("vis_cont"))
         {
-            OutputMode oldMode = settings[param->getStreamId()]->outputMode;
-            settings[param->getStreamId()]->outputMode = 
-                OutputMode(int(static_cast<CategoricalParameter*>(param)->getSelectedIndex() + 1));
-
-            if (oldMode == PH_AND_MAG || settings[param->getStreamId()]->outputMode == PH_AND_MAG)
-            {
-                CoreServices::updateSignalChain(editor.get());  // add or remove channels if necessary
-            }
+            setVisContChan(param->getValue());
+        }
+        else if(param->getName().equalsIgnoreCase("vis_event"))
+        {
+            jassert((int)param->getValue() >= -1);
+            settings[param->getStreamId()]->visEventChannel = param->getValue();
         }
         else
         {
-
+            //do nothing
         }
     }
 
@@ -1059,14 +920,15 @@ namespace PhaseCalculator
 
     void Node::handleEvent(TTLEventPtr event)
     {
-        if (visEventChannel < 0)
+        if (settings[selectedStream]->visEventChannel < 0)
         {
             return;
         }
 
         if (event->getEventType() == EventChannel::TTL)
         {
-            if (event->getChannelIndex() == visEventChannel && event->getState())
+            if (event->getChannelIndex() == settings[selectedStream]->visEventChannel 
+                && event->getState())
             {
                 // add timestamp to the queue for visualization
                 juce::int64 ts = event->getTimestamp();
@@ -1081,11 +943,11 @@ namespace PhaseCalculator
     {
         if (newChan >= 0)
         {
-            jassert(newChan < channelInfo.size() && channelInfo[newChan]->isActive());
+            // jassert(newChan < channelInfo.size() && channelInfo[newChan]->isActive());
 
             // disable event receival temporarily so we can flush the buffer
-            int tempVisEventChan = visEventChannel;
-            visEventChannel = -1;
+            int tempVisEventChan = settings[selectedStream]->visEventChannel;
+            settings[selectedStream]->visEventChannel = -1;
 
             // clear timestamp queue
             while (!visTsBuffer.empty())
@@ -1093,17 +955,17 @@ namespace PhaseCalculator
                 visTsBuffer.pop();
             }
 
-            visEventChannel = tempVisEventChan;
+            settings[selectedStream]->visEventChannel = tempVisEventChan;
         }
         
-        visContinuousChannel = newChan;
+        settings[selectedStream]->visContinuousChannel = newChan;
 
         // If acquisition is stopped (and thus the new channel might be from a different subprocessor),
         // update signal chain. Sinks such as LFP Viewer should receive this information.
-        if (!CoreServices::getAcquisitionStatus())
-        {
-            CoreServices::updateSignalChain(getEditor());
-        }
+        // if (!CoreServices::getAcquisitionStatus())
+        // {
+        //     CoreServices::updateSignalChain(getEditor());
+        // }
     }
 
     void Node::unwrapBuffer(float* wp, int nSamples, float lastPhase)
@@ -1189,61 +1051,18 @@ namespace PhaseCalculator
         }
     }
 
-    void Node::updateExtraChannels(uint16 streamId)
+
+    Array<int> Node::getActiveChannels()
     {
-        // reset dataChannelArray to # of inputs
-        int numInputs = getNumInputs();
-        int numChannels = getTotalContinuousChannels();
-        jassert(numChannels >= numInputs);
-        continuousChannels.removeLast(numChannels - numInputs);
+        Array<int> activeInputs;
 
-        if (settings[streamId]->outputMode == PH_AND_MAG)
+        if (selectedStream != 0)
         {
-            Array<int> activeInputs = settings[streamId]->getActiveInputs();
-            for (int chan : activeInputs)
-            {
-                // see GenericProcessor::createDataChannelsByType
-                ContinuousChannel* baseChan = getDataStream(streamId)->getContinuousChannels()[chan];
-                ContinuousChannel* newChan = new ContinuousChannel(*baseChan);
-
-                ContinuousChannel::Settings channelSettings
-                {
-                    baseChan->getChannelType(),
-                    baseChan->getName() + "MAG",
-                    baseChan->getDescription(),
-                    baseChan->getIdentifier(),
-                    baseChan->getBitVolts(), // BITVOLTS VALUE
-                    getDataStream(baseChan->getStreamId())
-                };
-
-                continuousChannels.add(new ContinuousChannel(channelSettings));
-                continuousChannels.getLast()->addProcessor(processorInfo.get());
-            }
+            for(int i : settings[selectedStream]->getActiveInputs())
+                activeInputs.add(i);
         }
-
-        // getEditor()->updateView();
         
-    }
-
-    void Node::deselectAllExtraChannels(uint16 streamId)
-    {
-        jassert(outputMode == PH_AND_MAG);
-        Array<int> activeChans =  
-            static_cast<SelectedChannelsParameter*>(getDataStream(streamId)->getParameter("Channels"))->getArrayValue();
-        
-        int nInputs = getNumInputs();
-        int nExtraChans = 0;
-        for (int chan : activeChans)
-        {
-            if (chan < nInputs)
-            {
-                nExtraChans++;
-            }
-            else if (chan < nInputs + nExtraChans)
-            {
-                settings[streamId]->deselectChannel(chan, false);
-            }
-        }
+        return activeInputs;
     }
 
     void Node::calcVisPhases(ActiveChannelInfo* acInfo, juce::int64 sdbEndTs)
@@ -1294,16 +1113,6 @@ namespace PhaseCalculator
                 double phaseRad = std::arg(analyticPt);
                 visPhaseBuffer.push(phaseRad);
 
-                // add to event channel
-                if (!visPhaseChannel)
-                {
-                    jassertfalse; // event channel should not be null here.
-                    continue;
-                }
-                double eventData = phaseRad * 180.0 / Dsp::doublePi;
-                juce::int64 eventTs = sdbEndTs - getNumSamples(acInfo->chanInfo.chan);
-                BinaryEventPtr event = BinaryEvent::createBinaryEvent(visPhaseChannel, eventTs, &eventData, sizeof(double));
-                addEvent(event, 0);
             }
         }
     }

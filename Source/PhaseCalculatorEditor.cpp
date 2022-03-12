@@ -33,71 +33,27 @@ namespace PhaseCalculator
         : VisualizerEditor(parentNode, 300)
     {
         tabText = "Event Phase Plot";
-        int filterWidth = 120;
+        int filterWidth = 105;
 
         // make the canvas now, so that restoring its parameters always works.
         canvas = std::make_unique<Canvas>(parentNode);
 
-        addComboBoxParameterEditor("freq_band", 5, 25);
+        addComboBoxParameterEditor("freq_range", 10, 30);
 
-        addTextBoxParameterEditor("low_cut", 5, 70);
+        addTextBoxParameterEditor("low_cut", filterWidth, 25);
 
-        addTextBoxParameterEditor("high_cut", 5, 100);
+        addTextBoxParameterEditor("high_cut", filterWidth, 75);
 
-        addTextBoxParameterEditor("recalc_ar", filterWidth, 25);
+        addTextBoxParameterEditor("ar_refresh", filterWidth + 90, 25);
 
-        addTextBoxParameterEditor("ar_order", filterWidth, 65);
+        addTextBoxParameterEditor("ar_order", filterWidth + 90, 75);
 
-        addComboBoxParameterEditor("output_mode", filterWidth, 87);
-
-        addSelectedChannelsParameterEditor("Channels", filterWidth + 80, 30);
+        addSelectedChannelsParameterEditor("Channels", 10, 90);
 
     }
 
     Editor::~Editor() {}
 
-    // void Editor::channelChanged(int chan, bool newState)
-    // {
-    //     auto pc = static_cast<Node*>(getProcessor());
-    //     if (chan < pc->getNumInputs())
-    //     {
-    //         // mark channel as activated or deactivated
-    //         if (newState)
-    //         {
-    //             // check whether channel can be activated
-    //             if (!pc->activateInputChannel(chan))
-    //             {
-    //                 pc->deselectChannel(chan, true);
-    //                 return;
-    //             }
-    //         }
-    //         else
-    //         {
-    //             pc->deactivateInputChannel(chan);
-    //         }
-            
-    //         // update visualizer and maybe extra output channels
-    //         if (pc->outputMode == PH_AND_MAG)
-    //         {
-    //             if (newState)
-    //             {
-    //                 extraChanManager.addExtraChan(chan);
-    //             }
-    //             else
-    //             {
-    //                 extraChanManager.removeExtraChan(chan);
-    //             }
-
-    //             // Update signal chain to add/remove output channels if necessary
-    //             CoreServices::updateSignalChain(this);
-    //         }
-    //         else // (if not updating the whole signal chain)
-    //         {
-    //             // update the available continuous channels for visualizer
-    //             updateVisualizer();
-    //         }
-    //     }
-    // }
 
     Visualizer* Editor::createNewCanvas()
     {
