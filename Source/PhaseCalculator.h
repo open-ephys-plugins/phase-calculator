@@ -271,40 +271,41 @@ namespace PhaseCalculator
         friend class Editor;
     public:
 
+        /** Constructor */
         Node();
-        ~Node();
 
-        bool hasEditor() const override;
+        /** Destructor */
+        ~Node() { }
 
+        /** Creates the PhaseCalculatorEditor */
         AudioProcessorEditor* createEditor() override;
 
-        // void createEventChannels() override;
+        /** 
+            Overwrites a subset of channels with the instantaneous phase in a given
+            frequency band.
+         */
+        void process(AudioBuffer<float>& buffer) override;
 
-        // void setParameter(int parameterIndex, float newValue) override;
-
-        void process(AudioSampleBuffer& buffer) override;
-
+        /** Starts phase calculation thread */
         bool startAcquisition() override;
+
+        /** Stops phase calculation code */
         bool stopAcquisition() override;
 
-        // thread code - recalculates AR parameters.
+        /** thread code - recalculates AR parameters. */
         void run() override;
 
-        // handle changing number of channels
+        /** Called whenever inputs are changed  */
         void updateSettings() override;
 
         /** Called whenever a parameter's value is changed (called by GenericProcessor::setParameter())*/
         void parameterValueChanged(Parameter* param) override;
 
-        // reads from the visPhaseBuffer if it can acquire a TryLock. returns true if successful.
+        /** reads from the visPhaseBuffer if it can acquire a TryLock. returns true if successful. */
         bool tryToReadVisPhases(std::queue<double>& other);
 
-        // Returns array of active channels that only includes inputs (not extra outputs)
+        /** Returns array of active channels that only includes inputs (not extra outputs) */
         Array<int> getActiveChannels();
-
-        // for visualizer continuous channel
-        // void saveCustomChannelParametersToXml(XmlElement* channelElement, int channelNumber, InfoObjectCommon::InfoObjectType channelType) override;
-        // void loadCustomChannelParametersFromXml(XmlElement* channelElement, InfoObjectCommon::InfoObjectType channelType) override;
 
         /*
         * Circular distance between angles x and ref (in radians). The "cutoff" is the maximum
@@ -317,24 +318,14 @@ namespace PhaseCalculator
 
         // ---- methods ----
 
-        // Allow responding to stim events if a stimEventChannel is selected.
-        void handleEvent(TTLEventPtr event) override;
+        /** Responds to incoming events if a stimEventChannel is selected. */
+        void handleTTLEvent(TTLEventPtr event) override;
 
-        // Do glitch unwrapping
+        /** Perform glitch unwrapping */
         void unwrapBuffer(float* wp, int nSamples, float lastPhase);
 
-        // Do start-of-buffer smoothing
+        /** Do start-of-buffer smoothing */
         void smoothBuffer(float* wp, int nSamples, float lastPhase);
-
-        // Update subProcessorMap
-        void updateSubProcessorMap();
-
-        // Create an extra output channel for each processed input channel if PH_AND_MAG is selected
-        // void updateExtraChannels(uint16 streamId);
-
-        // Calls deselectChannel on each channel that is not currently an input. Only relevant
-        // when the output mode is phase and magnitude.
-        // void deselectAllExtraChannels(uint16 streamId);
 
         /*
         * Check the visualization timestamp queue, clear any that are expired
@@ -344,8 +335,9 @@ namespace PhaseCalculator
         */
         void calcVisPhases(ActiveChannelInfo* acInfo, juce::int64 sdbEndTs);
 
-        // Sets visContinuousChannel and updates the visualization filter
+        /** Sets visContinuousChannel and updates the visualization filter */
         void setVisContChan(int newChan);
+        
         // ---- static utility methods ----
 
         /*
@@ -363,7 +355,7 @@ namespace PhaseCalculator
             const double* params, int samps, int stride, int order);
 
 
-        // Execute the hilbert transformer on one sample and update the state.
+        /** Execute the hilbert transformer on one sample and update the state. */
         static double htFilterSamp(double input, Band band, Array<double>& state);
 
         // ---- internals -------

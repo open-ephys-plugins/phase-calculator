@@ -120,7 +120,11 @@ namespace PhaseCalculator
         , public Button::Listener
     {
     public:
+
+        /** Constructor */
         Canvas(Node* pc);
+
+        /** Destructor */
         ~Canvas();
         void refreshState() override;
         void update() override;
@@ -146,10 +150,13 @@ namespace PhaseCalculator
         // updates countLabel, meanLabel, and stdLabel
         void updateStatLabels();
 
+        /** Saves parameters to disk */
         void saveCustomParametersToXml (XmlElement* xml) override;
+
+        /** Loads parameters from disk */
         void loadCustomParametersFromXml (XmlElement* xml) override;
 
-        // display updaters - do not trigger listeners.
+        /** Display updaters - do not trigger listeners */
         void displayContinuousChan(int chan);
 
     private:

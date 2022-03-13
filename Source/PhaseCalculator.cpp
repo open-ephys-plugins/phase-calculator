@@ -506,13 +506,6 @@ namespace PhaseCalculator
         addIntParameter(Parameter::STREAM_SCOPE, "vis_event", "Event channel to plot phases", -1, 0, 1000, true);
     }
 
-    Node::~Node() {}
-
-    bool Node::hasEditor() const
-    {
-        return true;
-    }
-
 
     AudioProcessorEditor* Node::createEditor()
     {
@@ -521,11 +514,12 @@ namespace PhaseCalculator
     }
 
 
-    void Node::process(AudioSampleBuffer& buffer)
+    void Node::process(AudioBuffer<float>& buffer)
     {
 
         // check for events to visualize
         bool hasCanvas = static_cast<Editor*>(getEditor())->canvas != nullptr;
+
         if (hasCanvas && settings[selectedStream]->visEventChannel > -1)
         {
             checkForEvents();
@@ -665,7 +659,6 @@ namespace PhaseCalculator
         }
     }
 
-    // starts thread when acquisition begins
     bool Node::startAcquisition()
     {
         if (isEnabled)
@@ -918,7 +911,7 @@ namespace PhaseCalculator
 
     // ------------ PRIVATE METHODS ---------------
 
-    void Node::handleEvent(TTLEventPtr event)
+    void Node::handleTTLEvent(TTLEventPtr event)
     {
         if (settings[selectedStream]->visEventChannel < 0)
         {
@@ -959,13 +952,6 @@ namespace PhaseCalculator
         }
         
         settings[selectedStream]->visContinuousChannel = newChan;
-
-        // If acquisition is stopped (and thus the new channel might be from a different subprocessor),
-        // update signal chain. Sinks such as LFP Viewer should receive this information.
-        // if (!CoreServices::getAcquisitionStatus())
-        // {
-        //     CoreServices::updateSignalChain(getEditor());
-        // }
     }
 
     void Node::unwrapBuffer(float* wp, int nSamples, float lastPhase)
