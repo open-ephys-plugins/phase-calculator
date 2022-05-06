@@ -305,7 +305,7 @@ namespace PhaseCalculator
         else if (comboBoxThatHasChanged == eChannelBox)
         {
             // subtract 2, since index 1 == no channel (-1)
-            int newValue = eChannelBox->getSelectedId() - 1;
+            int newValue = eChannelBox->getSelectedId() - 2;
             processor->getParameter("vis_event")->setNextValue(newValue);
         }
     }

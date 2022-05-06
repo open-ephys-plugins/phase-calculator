@@ -129,7 +129,7 @@ namespace PhaseCalculator
 
 
     /**** channel info *****/
-    ActiveChannelInfo::ActiveChannelInfo(const ChannelInfo& cInfo)
+    ActiveChannelInfo::ActiveChannelInfo(const ChannelInfo* cInfo)
         : chanInfo(cInfo)
     {
         update();
@@ -137,17 +137,19 @@ namespace PhaseCalculator
 
     void ActiveChannelInfo::update()
     {
-        DataStream* ds = chanInfo.stream;
+        const DataStream* ds = chanInfo->stream;
         int arOrder = ds->getParameter("ar_order")->getValue();
         float highCut = ds->getParameter("high_cut")->getValue();
         float lowCut = ds->getParameter("low_cut")->getValue();
         Band band = (Band)static_cast<CategoricalParameter*>(ds->getParameter("freq_range"))->getSelectedIndex();
 
+        LOGD("******** BAND: ", (int)band, " lowcut: ", lowCut, " highCut: ", highCut);
+
         // update length of history based on sample rate
         // the history buffer should have enough samples to calculate phases for the viusalizer
         // with the proper Hilbert transform length AND train an AR model of the requested order,
         // using at least 1 second of data
-        int newHistorySize = chanInfo.dsFactor * jmax(
+        int newHistorySize = chanInfo->dsFactor * jmax(
             visHilbertLengthMs * Hilbert::fs / 1000,
             arOrder + 1,
             1 * Hilbert::fs);
@@ -159,17 +161,17 @@ namespace PhaseCalculator
         {
             filt->setup(
                 2,                      // order
-                chanInfo.sampleRate,    // sample rate
+                chanInfo->sampleRate,    // sample rate
                 (highCut + lowCut) / 2, // center frequency
                 highCut - lowCut);      // bandwidth
         }
 
-        arModeler.setParams(arOrder, newHistorySize, chanInfo.dsFactor);
+        arModeler.setParams(arOrder, newHistorySize, chanInfo->dsFactor);
 
         htState.resize(Hilbert::delay[band] * 2 + 1);
 
         // visualization stuff
-        hilbertLengthMultiplier = Hilbert::fs * chanInfo.dsFactor / 1000;
+        hilbertLengthMultiplier = Hilbert::fs * chanInfo->dsFactor / 1000;
         visHilbertBuffer.resize(visHilbertLengthMs * hilbertLengthMultiplier);
 
         reset();
@@ -188,7 +190,7 @@ namespace PhaseCalculator
     }
 
 
-    ChannelInfo::ChannelInfo(DataStream* ds, int i)
+    ChannelInfo::ChannelInfo(const DataStream* ds, int i)
         : chan          (i)
         , sampleRate    (0)
         , dsFactor      (0)
@@ -232,7 +234,7 @@ namespace PhaseCalculator
     {
         if (!isActive() && dsFactor != 0)
         {
-            acInfo = new ActiveChannelInfo(*this);
+            acInfo = new ActiveChannelInfo(this);
         }
 
         return isActive();
@@ -256,7 +258,8 @@ namespace PhaseCalculator
         visContinuousChannel(-1),
         visEventChannel(-1)
     {
-
+        channelInfo.clear();
+        setBand(Band(0), true);
     }
 
     void Settings::updateAllChannels()
@@ -355,7 +358,6 @@ namespace PhaseCalculator
         htTempState.resize(delay * 2 + 1);
         predSamps.resize(delay + 1);
 
-        updateActiveChannels();
     }
 
     void Settings::resetCutsToDefaults()
@@ -490,9 +492,9 @@ namespace PhaseCalculator
 
         const Array<float>& defaultBand = Hilbert::defaultBand[0];
         
-        addIntParameter(Parameter::STREAM_SCOPE, "low_cut", "Low Cut", (int)defaultBand[0], 0, 1000, true);
+        addFloatParameter(Parameter::STREAM_SCOPE, "low_cut", "Low Cut", defaultBand[0], 0.0f, 1000.0f, true);
         
-        addIntParameter(Parameter::STREAM_SCOPE, "high_cut", "High Cut", (int)defaultBand[1], 0, 1000, true);
+        addFloatParameter(Parameter::STREAM_SCOPE, "high_cut", "High Cut", defaultBand[1], 0.0f, 1000.0f, true);
         
         desc = "Time to wait between calls to update the autoregressive models"; 
         addIntParameter(Parameter::STREAM_SCOPE, "ar_refresh", desc, 50, 0, 10000, true);
@@ -502,8 +504,8 @@ namespace PhaseCalculator
         
         addSelectedChannelsParameter(Parameter::STREAM_SCOPE, "Channels", "Selectable Channels", std::numeric_limits<int>::max(), true);
 
-        addIntParameter(Parameter::STREAM_SCOPE, "vis_cont", "Phase calculation channel", -1, 0, 1000, true);
-        addIntParameter(Parameter::STREAM_SCOPE, "vis_event", "Event channel to plot phases", -1, 0, 1000, true);
+        addIntParameter(Parameter::STREAM_SCOPE, "vis_cont", "Phase calculation channel", -1, -1, 1000, true);
+        addIntParameter(Parameter::STREAM_SCOPE, "vis_event", "Event channel to plot phases", -1, -1, 1000, true);
     }
 
 
@@ -534,13 +536,15 @@ namespace PhaseCalculator
                 // iterate over active input channels
                 Array<int> activeChans = settings[stream->getStreamId()]->getActiveInputs();
                 int numActiveChans = activeChans.size();
+
+                int nSamples = getNumSamplesInBlock(stream->getStreamId());
+
                 for (int ac = 0; ac < numActiveChans; ++ac)
                 {
                     ChannelInfo* chanInfo = settings[stream->getStreamId()]->channelInfo[activeChans[ac]];
                     ActiveChannelInfo* acInfo = chanInfo->acInfo;
 
                     int chan = chanInfo->chan;
-                    int nSamples = getNumSamples(chan);
                     if (nSamples == 0) // nothing to do
                     {
                         continue;
@@ -561,7 +565,7 @@ namespace PhaseCalculator
 
                         // use AR model to fill predSamps (which is downsampled) based on past data.
                         int htDelay = Hilbert::delay[settings[stream->getStreamId()]->band];
-                        int stride = acInfo->chanInfo.dsFactor;
+                        int stride = chanInfo->dsFactor;
 
                         double* pPredSamps = settings[stream->getStreamId()]->predSamps.getRawDataPointer();
                         const double* pLocalParam = localARParams.getRawDataPointer();
@@ -652,7 +656,7 @@ namespace PhaseCalculator
                     // if this is the monitored channel for events, check whether we can add a new phase
                     if (hasCanvas && chan == settings[stream->getStreamId()]->visContinuousChannel && acInfo->history.isFull())
                     {
-                        calcVisPhases(acInfo, getTimestamp(chan) + getNumSamples(chan));
+                        calcVisPhases(acInfo, getFirstSampleNumberForBlock(stream->getStreamId()));
                     }
                 }
             }
@@ -762,31 +766,18 @@ namespace PhaseCalculator
 
         for (auto stream : getDataStreams())
         {
-            parameterValueChanged(stream->getParameter("freq_range"));
-
-            // update arrays that store one entry per input
-            auto cInfo = &settings[stream->getStreamId()]->channelInfo;
+            // // update arrays that store one entry per input
             int numInputs = stream->getChannelCount();
-            int prevNumInputs = cInfo->size();
+            int prevNumInputs = settings[stream->getStreamId()]->channelInfo.size();
 
             int nToRemove = jmax(prevNumInputs - numInputs, 0);
-            cInfo->removeLast(nToRemove);
-
-            settings[stream->getStreamId()]->updateAllChannels();
-
-            Array<var>* activeChannels = stream->getParameter("Channels")->getValue().getArray();
-        
-            if (activeChannels->size() > 0)
-            {
-                selectedStream = stream->getStreamId();
-            }
-
+            settings[stream->getStreamId()]->channelInfo.removeLast(nToRemove);
 
             for (int i = prevNumInputs; i < numInputs; ++i)
             {
-                cInfo->add(new ChannelInfo(getDataStream(stream->getStreamId()), i));
+                ChannelInfo* addChanInfo = new ChannelInfo(stream, i);
+                settings[stream->getStreamId()]->channelInfo.add(addChanInfo);
             }
-            
         }
 
         if(selectedStream == 0)
@@ -798,19 +789,22 @@ namespace PhaseCalculator
     {
         LOGC("Phase Calculator: Value changed for ", param->getName(), ": ", (int)param->getValue());
 
+        juce::uint16 paramStreamId = param->getStreamId();
+        auto stream = getDataStream(paramStreamId);
+
         if (param->getName().equalsIgnoreCase("Channels"))
         {
-            selectedStream = param->getStreamId();
+            selectedStream = paramStreamId;
             
             auto paramValue = static_cast<SelectedChannelsParameter*>(param)->getValue();
 
-            for (int i = 0; i < getDataStream(param->getStreamId())->getChannelCount(); i++)
+            for (int i = 0; i < getDataStream(paramStreamId)->getChannelCount(); i++)
             {
                 // mark channel as activated or deactivated
                 if (paramValue.getArray()->contains(i))
                 {
                     // check whether channel can be activated
-                    if (!settings[param->getStreamId()]->activateInputChannel(i))
+                    if (!settings[paramStreamId]->activateInputChannel(i))
                     {
                         LOGD("Failed to activate input channel ", i);
                         paramValue.getArray()->remove(i);
@@ -820,7 +814,7 @@ namespace PhaseCalculator
                 }
                 else
                 {
-                    settings[param->getStreamId()]->deactivateInputChannel(i);
+                    settings[paramStreamId]->deactivateInputChannel(i);
                 }
             }
 
@@ -829,33 +823,89 @@ namespace PhaseCalculator
         }
         else if(param->getName().equalsIgnoreCase("freq_range"))
         {
-            settings[param->getStreamId()]->setBand(Band(int(static_cast<CategoricalParameter*>(param)->getSelectedIndex())), true);
+            settings[paramStreamId]->setBand(Band((int)param->getValue()), true);
+
+            if(stream->getParameter("low_cut") != nullptr && stream->getParameter("high_cut") != nullptr)
+            {
+                stream->getParameter("low_cut")->setNextValue(settings[paramStreamId]->lowCut);
+                stream->getParameter("high_cut")->setNextValue(settings[paramStreamId]->highCut);
+                settings[paramStreamId]->updateActiveChannels();
+            }
         }
         else if(param->getName().equalsIgnoreCase("ar_refresh"))
         {
-            settings[param->getStreamId()]->calcInterval = param->getValue();
+            settings[paramStreamId]->calcInterval = param->getValue();
         }
         else if(param->getName().equalsIgnoreCase("ar_order"))
         {
-            settings[param->getStreamId()]->arOrder = param->getValue();
-            settings[param->getStreamId()]->updateActiveChannels();
+            settings[paramStreamId]->arOrder = param->getValue();
+            settings[paramStreamId]->updateActiveChannels();
         }
         else if(param->getName().equalsIgnoreCase("low_cut"))
         {
-            settings[param->getStreamId()]->setLowCut(param->getValue());
+            float newLowCut = (float)param->getValue();
+            if (newLowCut == settings[paramStreamId]->lowCut) 
+                return; 
+
+            const Array<float>& validBand = Hilbert::validBand[settings[paramStreamId]->band];
+
+            if (newLowCut < validBand[0] || newLowCut >= validBand[1])
+            {
+                // invalid; don't set parameter and reset editor
+                CoreServices::sendStatusMessage("Low cut outside valid band of selected filter.");
+                param->restorePreviousValue();
+                return;
+            }
+
+            settings[paramStreamId]->lowCut = newLowCut;
+
+            if (newLowCut >= settings[paramStreamId]->highCut)
+            {
+                // push highCut up
+                stream->getParameter("high_cut")->setNextValue(jmin(newLowCut + passbandEps, validBand[1]));
+            }
+            else
+            {
+                settings[paramStreamId]->updateScaleFactor();
+                settings[paramStreamId]->updateActiveChannels();
+            }
         }
         else if(param->getName().equalsIgnoreCase("high_cut"))
         {
-            settings[param->getStreamId()]->setHighCut(param->getValue());
+            float newHighCut = (float)param->getValue();
+            if (newHighCut == settings[paramStreamId]->highCut)
+                return;
+
+            const Array<float>& validBand = Hilbert::validBand[settings[paramStreamId]->band];
+
+            if (newHighCut <= validBand[0] || newHighCut > validBand[1])
+            {
+
+                CoreServices::sendStatusMessage("High cut outside valid band of selected filter.");
+                param->restorePreviousValue();
+                return;
+            }
+
+            settings[paramStreamId]->highCut = newHighCut;
+            if (newHighCut <= settings[paramStreamId]->lowCut)
+            {
+                // push lowCut down
+                stream->getParameter("low_cut")->setNextValue(jmax(newHighCut - passbandEps, validBand[0]));
+            }
+            else
+            {
+                settings[paramStreamId]->updateScaleFactor();
+                settings[paramStreamId]-> updateActiveChannels();
+            }
         }
         else if(param->getName().equalsIgnoreCase("vis_cont"))
         {
-            setVisContChan(param->getValue());
+            setVisContChan((int)param->getValue());
         }
         else if(param->getName().equalsIgnoreCase("vis_event"))
         {
             jassert((int)param->getValue() >= -1);
-            settings[param->getStreamId()]->visEventChannel = param->getValue();
+            settings[paramStreamId]->visEventChannel = (int)param->getValue();
         }
         else
         {
@@ -879,28 +929,6 @@ namespace PhaseCalculator
         return true;
     }
 
-    // void Node::saveCustomChannelParametersToXml(XmlElement* channelElement,
-    //     int channelNumber, InfoObjectCommon::InfoObjectType channelType)
-    // {
-    //     if (channelType == InfoObjectCommon::DATA_CHANNEL && channelNumber == visContinuousChannel)
-    //     {
-    //         channelElement->setAttribute("visualize", 1);
-    //     }
-    // }
-
-    // void Node::loadCustomChannelParametersFromXml(XmlElement* channelElement,
-    //     InfoObjectCommon::InfoObjectType channelType)
-    // {
-    //     int chanNum = channelElement->getIntAttribute("number");
-
-    //     if (chanNum < getNumInputs() && channelElement->hasAttribute("visualize"))
-    //     {
-    //         // The saved channel should be added to the dropdown at this point.
-    //         setVisContChan(chanNum);
-    //         static_cast<Editor*>(getEditor())->refreshVisContinuousChan();
-    //     }
-    // }
-
     double Node::circDist(double x, double ref, double cutoff)
     {
         static const double twoPi = 2 * Dsp::doublePi;
@@ -920,11 +948,11 @@ namespace PhaseCalculator
 
         if (event->getEventType() == EventChannel::TTL)
         {
-            if (event->getChannelIndex() == settings[selectedStream]->visEventChannel 
+            if (event->getLine() == settings[selectedStream]->visEventChannel 
                 && event->getState())
             {
                 // add timestamp to the queue for visualization
-                juce::int64 ts = event->getTimestamp();
+                juce::int64 ts = event->getSampleNumber();
                 jassert(visTsBuffer.empty() || visTsBuffer.back() <= ts);
                 visTsBuffer.push(ts);
             }

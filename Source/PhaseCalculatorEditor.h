@@ -41,31 +41,7 @@ namespace PhaseCalculator
 
         Visualizer* createNewCanvas() override;
 
-        void saveVisualizerEditorParameters(XmlElement* xml) override;
-        void loadVisualizerEditorParameters(XmlElement* xml) override;
-
     private:
-
-        /*
-        * Select a frequency band when loading based on the saved information.
-        * Don't want to use the index in case bands are added/removed in the future (and it's less readable).
-        * Instead, try to match the min and max valid frequencies of the range. If that fails (or if
-        * the rangeMin and rangeMax attributes don't exist), find the band that encompasses lowCut and highCut
-        * and puts them closest to the center. Finally, if all else fails, just return the first band.
-        */
-        static int selectBandFromSavedParams(const XmlElement* xmlNode);
-
-        /*
-        * Tries to read a number of type out from input. Returns false if unsuccessful.
-        * Otherwise, returns true and writes the result to *out.
-        */
-        template<typename T>
-        static bool readNumber(const String& input, T& out)
-        {
-            std::istringstream istream(input.toStdString());
-            istream >> out;
-            return !istream.fail();
-        }
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Editor);
     };

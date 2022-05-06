@@ -102,7 +102,7 @@ namespace PhaseCalculator
 
     struct ActiveChannelInfo
     {
-        ActiveChannelInfo(const ChannelInfo& cInfo);
+        ActiveChannelInfo(const ChannelInfo* cInfo);
 
         void update();
 
@@ -142,7 +142,7 @@ namespace PhaseCalculator
         FFTWTransformableArray visHilbertBuffer;
         BandpassFilter reverseFilter;
 
-        const ChannelInfo& chanInfo;
+        const ChannelInfo* chanInfo;
 
     private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ActiveChannelInfo);
@@ -150,7 +150,7 @@ namespace PhaseCalculator
 
     struct ChannelInfo
     {
-        ChannelInfo(DataStream* ds, int i);
+        ChannelInfo(const DataStream* ds, int i);
 
         void update();
 
@@ -171,7 +171,7 @@ namespace PhaseCalculator
 
         // info for ongoing phase calculation - null if non-active.
         ScopedPointer<ActiveChannelInfo> acInfo;
-        DataStream* stream;
+        const DataStream* stream;
 
     private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ChannelInfo);
