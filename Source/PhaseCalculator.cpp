@@ -143,8 +143,6 @@ namespace PhaseCalculator
         float lowCut = ds->getParameter("low_cut")->getValue();
         Band band = (Band)static_cast<CategoricalParameter*>(ds->getParameter("freq_range"))->getSelectedIndex();
 
-        LOGD("******** BAND: ", (int)band, " lowcut: ", lowCut, " highCut: ", highCut);
-
         // update length of history based on sample rate
         // the history buffer should have enough samples to calculate phases for the viusalizer
         // with the proper Hilbert transform length AND train an AR model of the requested order,
@@ -778,6 +776,8 @@ namespace PhaseCalculator
                 ChannelInfo* addChanInfo = new ChannelInfo(stream, i);
                 settings[stream->getStreamId()]->channelInfo.add(addChanInfo);
             }
+
+            parameterValueChanged(stream->getParameter("Channels"));
         }
 
         if(selectedStream == 0)
@@ -787,8 +787,6 @@ namespace PhaseCalculator
 
     void Node::parameterValueChanged(Parameter* param)
     {
-        LOGC("Phase Calculator: Value changed for ", param->getName(), ": ", (int)param->getValue());
-
         juce::uint16 paramStreamId = param->getStreamId();
         auto stream = getDataStream(paramStreamId);
 
