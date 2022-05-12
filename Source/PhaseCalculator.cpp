@@ -260,36 +260,6 @@ namespace PhaseCalculator
         setBand(Band(0), true);
     }
 
-    void Settings::updateAllChannels()
-    {
-        for (auto chanInfo : channelInfo)
-        {
-            bool wasActive = chanInfo->isActive();
-            chanInfo->update();
-
-            if (wasActive && !chanInfo->isActive())
-            {
-                // deselect if this channel just got deactivated
-                deselectChannel(chanInfo->chan, true);
-
-            }
-        }
-    }
-
-    void Settings::deselectChannel(int chan, bool warn)
-    {
-        Parameter* p = channelInfo[chan]->stream->getParameter("Channels");
-        auto paramValue = p->getValue();
-        paramValue.getArray()->remove(chan);
-        p->setNextValue(paramValue);        
-
-        if (warn)
-        {
-            CoreServices::sendStatusMessage("Channel " + String(chan + 1) + " was deselected because" +
-                " its sample rate is not a multiple of " + String(Hilbert::fs));
-        }
-    }
-
     Array<int> Settings::getActiveInputs() const
     {
         Array<int> activeInputs;
@@ -368,54 +338,6 @@ namespace PhaseCalculator
         updateActiveChannels();
     }
 
-    void Settings::setLowCut(float newLowCut)
-    {
-        if (newLowCut == lowCut) { return; }
-
-        const Array<float>& validBand = Hilbert::validBand[band];
-
-        if (newLowCut < validBand[0] || newLowCut >= validBand[1])
-        {
-            // invalid; don't set parameter and reset editor
-            CoreServices::sendStatusMessage("Low cut outside valid band of selected filter.");
-            return;
-        }
-
-        lowCut = newLowCut;
-        if (lowCut >= highCut)
-        {
-            // push highCut up
-            highCut = jmin(lowCut + passbandEps, validBand[1]);
-        }
-
-        updateScaleFactor();
-        updateActiveChannels();
-    }
-
-    void Settings::setHighCut(float newHighCut)
-    {
-        if (newHighCut == highCut) { return; }
-
-        const Array<float>& validBand = Hilbert::validBand[band];
-
-        if (newHighCut <= validBand[0] || newHighCut > validBand[1])
-        {
-
-            CoreServices::sendStatusMessage("High cut outside valid band of selected filter.");
-            return;
-        }
-
-        highCut = newHighCut;
-        if (highCut <= lowCut)
-        {
-            // push lowCut down
-            lowCut = jmax(highCut - passbandEps, validBand[0]);
-        }
-
-        updateScaleFactor();
-        updateActiveChannels();
-    }
-
     void Settings::updateScaleFactor()
     {
         htScaleFactor = getScaleFactor(band, lowCut, highCut);
@@ -474,9 +396,10 @@ namespace PhaseCalculator
         setProcessorType(Plugin::Processor::FILTER);
 
         selectedStream = 0;
+        activeChansNeedsUpdate = true;
 
         StringArray bands;
-        for (int b = 0; b < NUM_BANDS; ++b)
+        for (int b = 0; b < NUM_BANDS - 1; ++b)
             bands.add(Hilbert::bandName[b]);
 
         addCategoricalParameter(Parameter::STREAM_SCOPE, 
@@ -484,26 +407,26 @@ namespace PhaseCalculator
                                 "Each option corresponds internally to a Hilbert transformer that is optimized for this frequency range."
                                 + String("After selecting a range, you can adjust ") +
                                 "'low' and 'high' to filter to any passband within this range.",
-                                bands, 0, true 
-                                );
+                                bands, 0 );
+
         String desc;
 
         const Array<float>& defaultBand = Hilbert::defaultBand[0];
         
-        addFloatParameter(Parameter::STREAM_SCOPE, "low_cut", "Low Cut", defaultBand[0], 0.0f, 1000.0f, true);
+        addFloatParameter(Parameter::STREAM_SCOPE, "low_cut", "Low Cut", defaultBand[0], 0.0f, 1000.0f, 1.0f);
         
-        addFloatParameter(Parameter::STREAM_SCOPE, "high_cut", "High Cut", defaultBand[1], 0.0f, 1000.0f, true);
+        addFloatParameter(Parameter::STREAM_SCOPE, "high_cut", "High Cut", defaultBand[1], 0.0f, 1000.0f, 1.0f);
         
         desc = "Time to wait between calls to update the autoregressive models"; 
-        addIntParameter(Parameter::STREAM_SCOPE, "ar_refresh", desc, 50, 0, 10000, true);
+        addIntParameter(Parameter::STREAM_SCOPE, "ar_refresh", desc, 50, 0, 10000);
         
         desc = "Order of the autoregressive models used to predict future data";
-        addIntParameter(Parameter::STREAM_SCOPE, "ar_order", desc, 20, 1, 1000, true);
+        addIntParameter(Parameter::STREAM_SCOPE, "ar_order", desc, 20, 1, 1000);
         
-        addSelectedChannelsParameter(Parameter::STREAM_SCOPE, "Channels", "Selectable Channels", std::numeric_limits<int>::max(), true);
+        addSelectedChannelsParameter(Parameter::STREAM_SCOPE, "Channels", "Selectable Channels", std::numeric_limits<int>::max());
 
-        addIntParameter(Parameter::STREAM_SCOPE, "vis_cont", "Phase calculation channel", -1, -1, 1000, true);
-        addIntParameter(Parameter::STREAM_SCOPE, "vis_event", "Event channel to plot phases", -1, -1, 1000, true);
+        addIntParameter(Parameter::STREAM_SCOPE, "vis_cont", "Phase calculation channel", -1, -1, 1000);
+        addIntParameter(Parameter::STREAM_SCOPE, "vis_event", "Event channel to plot phases", -1, -1, 1000);
     }
 
 
@@ -542,7 +465,7 @@ namespace PhaseCalculator
                     ChannelInfo* chanInfo = settings[stream->getStreamId()]->channelInfo[activeChans[ac]];
                     ActiveChannelInfo* acInfo = chanInfo->acInfo;
 
-                    int chan = chanInfo->chan;
+                    int chan = stream->getContinuousChannels().getUnchecked(chanInfo->chan)->getGlobalIndex();
                     if (nSamples == 0) // nothing to do
                     {
                         continue;
@@ -652,7 +575,9 @@ namespace PhaseCalculator
                     }
 
                     // if this is the monitored channel for events, check whether we can add a new phase
-                    if (hasCanvas && chan == settings[stream->getStreamId()]->visContinuousChannel && acInfo->history.isFull())
+                    if (hasCanvas
+                        && chanInfo->chan == settings[stream->getStreamId()]->visContinuousChannel
+                        && acInfo->history.isFull())
                     {
                         calcVisPhases(acInfo, getFirstSampleNumberForBlock(stream->getStreamId()));
                     }
@@ -665,6 +590,7 @@ namespace PhaseCalculator
     {
         if (isEnabled)
         {
+            activeChansNeedsUpdate = true;
             startThread(arPriority);
 
             // have to manually enable editor, I guess...
@@ -709,51 +635,64 @@ namespace PhaseCalculator
         return true;
     }
 
+    void Node::setSelectedStream(uint16 streamID)
+    {
+        selectedStream = streamID;
+        activeChansNeedsUpdate = true;
+    }
+
     // thread routine
     void Node::run()
     {
-        // collect enabled active channels and find maximum history length
         Array<ActiveChannelInfo*> activeChans;
         int maxHistoryLength = 0;
-        for(auto stream : getDataStreams())
+
+        Array<double> reverseData;
+
+        uint32 startTime, endTime;
+        while (!threadShouldExit())
         {
-            for (auto chanInfo : settings[stream->getStreamId()]->channelInfo)
-            {
-                if (chanInfo->isActive())
-                {
-                    activeChans.add(chanInfo->acInfo);
-                    maxHistoryLength = jmax(maxHistoryLength, chanInfo->acInfo->history.size());
-                }
-            }
-            Array<double> reverseData;
-            reverseData.resize(maxHistoryLength);
+            startTime = Time::getMillisecondCounter();
 
-            uint32 startTime, endTime;
-            while (!threadShouldExit())
+            // collect enabled active channels and find maximum history length
+            if(activeChansNeedsUpdate)
             {
-                startTime = Time::getMillisecondCounter();
+                activeChans.clear();
+                maxHistoryLength = 0;
 
-                for (auto acInfo : activeChans)
+                for (auto chanInfo : settings[selectedStream]->channelInfo)
                 {
-                    if (!acInfo->history.isFull())
+                    if (chanInfo->isActive())
                     {
-                        continue;
+                        activeChans.add(chanInfo->acInfo);
+                        maxHistoryLength = jmax(maxHistoryLength, chanInfo->acInfo->history.size());
                     }
-
-                    // unwrap reversed history and add to temporary data array
-                    double* dataPtr = reverseData.getRawDataPointer();
-                    acInfo->history.unwrapAndCopy(dataPtr, true);
-
-                    // calculate parameters
-                    acInfo->arModeler.fitModel(reverseData);
                 }
 
-                endTime = Time::getMillisecondCounter();
-                int remainingInterval = settings[stream->getStreamId()]->calcInterval - (endTime - startTime);
-                if (remainingInterval >= 10) // avoid WaitForSingleObject
+                reverseData.resize(maxHistoryLength);
+                activeChansNeedsUpdate = false;
+            }
+
+            for (auto acInfo : activeChans)
+            {
+                if (!acInfo->history.isFull())
                 {
-                    sleep(remainingInterval);
+                    continue;
                 }
+
+                // unwrap reversed history and add to temporary data array
+                double* dataPtr = reverseData.getRawDataPointer();
+                acInfo->history.unwrapAndCopy(dataPtr, true);
+
+                // calculate parameters
+                acInfo->arModeler.fitModel(reverseData);
+            }
+
+            endTime = Time::getMillisecondCounter();
+            int remainingInterval = settings[selectedStream]->calcInterval - (endTime - startTime);
+            if (remainingInterval >= 10) // avoid WaitForSingleObject
+            {
+                sleep(remainingInterval);
             }
         }
     }
@@ -764,14 +703,9 @@ namespace PhaseCalculator
 
         for (auto stream : getDataStreams())
         {
-            // // update arrays that store one entry per input
-            int numInputs = stream->getChannelCount();
-            int prevNumInputs = settings[stream->getStreamId()]->channelInfo.size();
+            settings[stream->getStreamId()]->channelInfo.clear();
 
-            int nToRemove = jmax(prevNumInputs - numInputs, 0);
-            settings[stream->getStreamId()]->channelInfo.removeLast(nToRemove);
-
-            for (int i = prevNumInputs; i < numInputs; ++i)
+            for (int i = 0; i < stream->getChannelCount(); ++i)
             {
                 ChannelInfo* addChanInfo = new ChannelInfo(stream, i);
                 settings[stream->getStreamId()]->channelInfo.add(addChanInfo);
@@ -780,8 +714,6 @@ namespace PhaseCalculator
             parameterValueChanged(stream->getParameter("Channels"));
         }
 
-        if(selectedStream == 0)
-            selectedStream = getDataStreams()[0]->getStreamId();
     }
 
 
@@ -790,11 +722,15 @@ namespace PhaseCalculator
         juce::uint16 paramStreamId = param->getStreamId();
         auto stream = getDataStream(paramStreamId);
 
+        LOGD("[PhaseCalc] Parameter value changed ", paramStreamId, " : ", param->getName(), " : ", (int)param->getValue());
+
         if (param->getName().equalsIgnoreCase("Channels"))
-        {
-            selectedStream = paramStreamId;
-            
+        {   
             auto paramValue = static_cast<SelectedChannelsParameter*>(param)->getValue();
+
+            LOGD("[PhaseCalc] Selected Channels Size: ", paramValue.getArray()->size());
+
+            bool paramNeedsUpdate = false;
 
             for (int i = 0; i < getDataStream(paramStreamId)->getChannelCount(); i++)
             {
@@ -805,8 +741,8 @@ namespace PhaseCalculator
                     if (!settings[paramStreamId]->activateInputChannel(i))
                     {
                         LOGD("Failed to activate input channel ", i);
-                        paramValue.getArray()->remove(i);
-                        param->setNextValue(paramValue);
+                        paramValue.getArray()->removeFirstMatchingValue(i);
+                        paramNeedsUpdate = true;
                         continue;
                     }
                 }
@@ -814,6 +750,14 @@ namespace PhaseCalculator
                 {
                     settings[paramStreamId]->deactivateInputChannel(i);
                 }
+            }
+
+            setSelectedStream(paramStreamId);
+
+            if(paramNeedsUpdate)
+            {
+                param->currentValue = paramValue;
+                getEditor()->updateView();
             }
 
             getEditor()->updateVisualizer();
@@ -879,6 +823,7 @@ namespace PhaseCalculator
             if (newHighCut <= validBand[0] || newHighCut > validBand[1])
             {
 
+                // invalid; don't set parameter and reset editor
                 CoreServices::sendStatusMessage("High cut outside valid band of selected filter.");
                 param->restorePreviousValue();
                 return;
@@ -946,7 +891,8 @@ namespace PhaseCalculator
 
         if (event->getEventType() == EventChannel::TTL)
         {
-            if (event->getLine() == settings[selectedStream]->visEventChannel 
+            if (event->getStreamId() == selectedStream
+                && event->getLine() == settings[selectedStream]->visEventChannel
                 && event->getState())
             {
                 // add timestamp to the queue for visualization

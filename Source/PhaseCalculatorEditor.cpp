@@ -58,4 +58,14 @@ namespace PhaseCalculator
     {
         return canvas.get();
     }
+
+    void Editor::selectedStreamHasChanged()
+    {
+        LOGD("[PhaseCalc] Selected stream has changed to: ", getCurrentStream());
+        Node* processor = (Node*)getProcessor();
+        processor->setSelectedStream(getCurrentStream());
+
+        // inform the canvas about selected stream updates
+        updateVisualizer();
+    }
 }

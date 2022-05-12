@@ -58,19 +58,7 @@ namespace PhaseCalculator
     struct ChannelInfo;
     class Node;
 
-    // parameter indices
-    enum Param
-    {
-        RECALC_INTERVAL,
-        AR_ORDER,
-        BAND,
-        LOWCUT,
-        HIGHCUT,
-        OUTPUT_MODE,
-        VIS_E_CHAN,
-        VIS_C_CHAN
-    };
-
+    
     class ReverseStack : public Array<double, CriticalSection>
     {
     public:
@@ -177,8 +165,6 @@ namespace PhaseCalculator
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ChannelInfo);
     };
 
-    // Output mode - corresponds to itemIDs on the ComboBox
-    enum OutputMode { PH = 1, MAG, PH_AND_MAG, IM };
 
     class Settings
     {
@@ -186,18 +172,6 @@ namespace PhaseCalculator
         Settings();
 
         ~Settings() { }
-
-        /*
-        * Convenience method to call "update" on all channel info objects (which also updates
-        * corresponding active channel info)
-        */
-        void updateAllChannels();
-
-        // Deselect given channel in the "PARAMS" channel selector. Useful to ensure "extra channels"
-        // remain deselected (so that they don't become active inputs if the # of inputs changes).
-        // If "warn" is true, sends a warning that the channel was deselected due to incompatible
-        // sample rate.
-        void deselectChannel(int chan, bool warn);
 
         // Returns array of active channels that only includes inputs (not extra outputs)
         Array<int> getActiveInputs() const;
@@ -221,12 +195,6 @@ namespace PhaseCalculator
 
         // Resets lowCut and highCut to defaults for the current band
         void resetCutsToDefaults();
-
-        // Sets lowCut (which in turn influences highCut)
-        void setLowCut(float newLowCut);
-
-        // Sets highCut (which in turn influences lowCut)
-        void setHighCut(float newHighCut);
 
         // Update the htScaleFactor depending on the lowCut and highCut of the filter.
         void updateScaleFactor();
@@ -314,6 +282,12 @@ namespace PhaseCalculator
         */
         static double circDist(double x, double ref, double cutoff = 2 * Dsp::doublePi);
 
+        /** Get the current selected stream */
+        juce::uint16 getSelectedStream() { return selectedStream; }
+
+        /** Set the current selected stream */
+        void setSelectedStream(juce::uint16 streamId);
+
     private:
 
         // ---- methods ----
@@ -362,14 +336,13 @@ namespace PhaseCalculator
 
         StreamSettings<Settings> settings;
 
+        /** Only one stream can be activated at a time*/
+        uint16 selectedStream;
+
         // storage areas
         Array<double, CriticalSection> localARParams;
         Array<int> htInds;
         Array<std::complex<double>> htOutput;
-
-        // maps full source subprocessor IDs of incoming streams to indices of
-        // corresponding subprocessors created here.
-        HashMap<int, uint16> subProcessorMap;
 
         // delayed analysis for visualization
 
@@ -380,11 +353,8 @@ namespace PhaseCalculator
         std::queue<double> visPhaseBuffer;
         CriticalSection visPhaseBufferCS;  // avoid race conditions when updating visualizer
 
-        // event channel to send visualized phases over
-        // EventChannel* visPhaseChannel;
-
-        /** Only one stream can be monitored at a time*/
-        uint16 selectedStream;
+        /** Notify Node thread to update it's list of active channels and find maximum history length */
+        bool activeChansNeedsUpdate;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Node);
     };

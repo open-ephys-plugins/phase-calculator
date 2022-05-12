@@ -129,8 +129,6 @@ namespace PhaseCalculator
         void refreshState() override;
         void update() override;
         void refresh() override;
-        void beginAnimation() override;
-        void endAnimation() override;
 
         void paint(Graphics& g) override;
         void resized() override;
