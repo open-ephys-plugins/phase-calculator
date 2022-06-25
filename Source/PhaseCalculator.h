@@ -132,7 +132,51 @@ namespace PhaseCalculator
 
         const ChannelInfo* chanInfo;
 
+        void waitForThreadToExit()
+        {
+            if (bufferResizeThread->isThreadRunning())
+            {
+                bufferResizeThread->waitForThreadToExit(1000);
+            }
+        }
+
     private:
+
+        class BufferResizeThread : public Thread
+        {
+        public:
+            BufferResizeThread(FFTWTransformableArray* buffer_) : Thread("buffer resize"),
+                buffer(buffer_), bufferSize(0)
+            {
+
+            }
+
+            ~BufferResizeThread() { 
+            
+                if (isThreadRunning())
+                {
+                    waitForThreadToExit(5000);
+                }
+            }
+
+            void setSize(int lengthMultiplier)
+            {
+                bufferSize = lengthMultiplier;
+            }
+
+            void run()
+            {
+                buffer->resize(bufferSize);
+            }
+
+        private:
+            FFTWTransformableArray* buffer;
+
+            int bufferSize;
+        };
+
+        std::unique_ptr<BufferResizeThread> bufferResizeThread;
+
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ActiveChannelInfo);
     };
 
@@ -158,10 +202,13 @@ namespace PhaseCalculator
         int dsFactor;
 
         // info for ongoing phase calculation - null if non-active.
-        ScopedPointer<ActiveChannelInfo> acInfo;
+        std::unique_ptr<ActiveChannelInfo> acInfo;
         const DataStream* stream;
 
     private:
+
+        bool isActivated; 
+
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ChannelInfo);
     };
 
@@ -355,6 +402,7 @@ namespace PhaseCalculator
 
         /** Notify Node thread to update it's list of active channels and find maximum history length */
         bool activeChansNeedsUpdate;
+
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Node);
     };

@@ -132,6 +132,9 @@ namespace PhaseCalculator
     ActiveChannelInfo::ActiveChannelInfo(const ChannelInfo* cInfo)
         : chanInfo(cInfo)
     {
+
+        bufferResizeThread = std::make_unique<BufferResizeThread>(&visHilbertBuffer);
+
         update();
     }
 
@@ -152,6 +155,7 @@ namespace PhaseCalculator
             arOrder + 1,
             1 * Hilbert::fs);
 
+        LOGC("PhaseCalculator: Resetting history size");
         history.resetAndResize(newHistorySize);
 
         // set filter parameters
@@ -164,14 +168,26 @@ namespace PhaseCalculator
                 highCut - lowCut);      // bandwidth
         }
 
+        LOGC("PhaseCalculator: Setting filter parameters");
         arModeler.setParams(arOrder, newHistorySize, chanInfo->dsFactor);
 
+        LOGC("PhaseCalculator: Resizing hilbert state");
         htState.resize(Hilbert::delay[band] * 2 + 1);
 
         // visualization stuff
         hilbertLengthMultiplier = Hilbert::fs * chanInfo->dsFactor / 1000;
-        visHilbertBuffer.resize(visHilbertLengthMs * hilbertLengthMultiplier);
 
+        LOGC("PhaseCalculator: Resizing visualization buffer to ", visHilbertLengthMs * hilbertLengthMultiplier);
+
+        if (bufferResizeThread->isThreadRunning())
+        {
+            bufferResizeThread->waitForThreadToExit(5000);
+        }
+        bufferResizeThread->setSize(visHilbertLengthMs * hilbertLengthMultiplier);
+        bufferResizeThread->startThread();
+        bufferResizeThread->waitForThreadToExit(10000);
+
+        LOGC("PhaseCalculator: Resetting info");
         reset();
     }
 
@@ -192,7 +208,7 @@ namespace PhaseCalculator
         : chan          (i)
         , sampleRate    (0)
         , dsFactor      (0)
-        , acInfo        (nullptr)
+        , isActivated   (false)
         , stream         (ds)
     {
         update();
@@ -201,6 +217,7 @@ namespace PhaseCalculator
     void ChannelInfo::update()
     {
         ContinuousChannel* contChannel = stream->getContinuousChannels().getUnchecked(chan); 
+        
         if (contChannel == nullptr)
         {
             jassertfalse;
@@ -211,12 +228,13 @@ namespace PhaseCalculator
 
         float fsMult = sampleRate / Hilbert::fs;
         float fsMultRound = std::round(fsMult);
+        
         if (std::abs(fsMult - fsMultRound) < FLT_EPSILON)
         {
             // can be active - sample rate is multiple of Hilbert Fs
             dsFactor = int(fsMultRound);
 
-            if (isActive())
+            if (isActivated)
             {
                 acInfo->update();
             }
@@ -230,22 +248,23 @@ namespace PhaseCalculator
 
     bool ChannelInfo::activate()
     {
-        if (!isActive() && dsFactor != 0)
+        if (!isActivated && dsFactor != 0)
         {
-            acInfo = new ActiveChannelInfo(this);
+            acInfo.reset(new ActiveChannelInfo(this));
+            isActivated = true;
         }
 
-        return isActive();
+        return isActivated;
     }
 
     void ChannelInfo::deactivate()
     {
-        acInfo = nullptr;
+        isActivated = false;
     }
 
     bool ChannelInfo::isActive() const
     {
-        return acInfo != nullptr;
+        return isActivated;
     }
 
 
@@ -463,7 +482,7 @@ namespace PhaseCalculator
                 for (int ac = 0; ac < numActiveChans; ++ac)
                 {
                     ChannelInfo* chanInfo = settings[stream->getStreamId()]->channelInfo[activeChans[ac]];
-                    ActiveChannelInfo* acInfo = chanInfo->acInfo;
+                    ActiveChannelInfo* acInfo = chanInfo->acInfo.get();
 
                     int chan = stream->getContinuousChannels().getUnchecked(chanInfo->chan)->getGlobalIndex();
                     if (nSamples == 0) // nothing to do
@@ -590,6 +609,19 @@ namespace PhaseCalculator
     {
         if (isEnabled)
         {
+
+            // wait for initialization threads to finish
+            for (auto stream : getDataStreams())
+            {
+                for (auto chanInfo : settings[stream->getStreamId()]->channelInfo)
+                {
+                    if (chanInfo->isActive())
+                    {
+                        chanInfo->acInfo->waitForThreadToExit();
+                    }
+                }
+            }
+
             activeChansNeedsUpdate = true;
             startThread(arPriority);
 
@@ -664,7 +696,7 @@ namespace PhaseCalculator
                 {
                     if (chanInfo->isActive())
                     {
-                        activeChans.add(chanInfo->acInfo);
+                        activeChans.add(chanInfo->acInfo.get());
                         maxHistoryLength = jmax(maxHistoryLength, chanInfo->acInfo->history.size());
                     }
                 }

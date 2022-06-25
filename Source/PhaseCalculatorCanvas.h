@@ -38,21 +38,26 @@ namespace PhaseCalculator
         , public Label::Listener
     {
     public:
+
+        /** Constructor*/
         RosePlot(Canvas* c);
+
+        /** Destructor */
         ~RosePlot();
 
+        /** Draw the plot*/
         void paint(Graphics& g) override;
 
-        // Change number of bins and repaint
+        /** Change number of bins and repaint*/
         void setNumBins(int newNumBins);
 
-        // Change reference angle and repaint
+        /**Change reference angle and repaint*/
         void setReference(double newReference);
 
-        // Add a new angle (in radians) and repaint
+        /** Add a new angle (in radians) and repaint*/
         void addAngle(double newAngle);
 
-        // Remove all angles from the plot and repaint
+        /** Remove all angles from the plot and repaint*/
         void clear();
 
         int getNumAngles();
