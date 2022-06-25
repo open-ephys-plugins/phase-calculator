@@ -1,39 +1,101 @@
-# Phase Calculator Plugin [![DOI](https://zenodo.org/badge/134900173.svg)](https://zenodo.org/badge/latestdoi/134900173)
+## Phase Calculator [![DOI](https://zenodo.org/badge/134900173.svg)](https://zenodo.org/badge/latestdoi/134900173)
 
-A plugin for the [Open Ephys GUI](https://github.com/open-ephys/plugin-GUI) to estimate the phase of inputs within a specified passband in real time. Its primary purpose is to enable closed-loop stimulation, typically in combination with the [Crossing Detector](https://github.com/tne-lab/crossing-detector) and either the Pulse Pal or an external stimulation system that receives ZeroMQ events (for example, the LabVIEW implementation [here](https://github.com/tne-lab/closed-loop-stim)). It can also output the magnitude or imaginary component of the band-limited analytic signal instead of the phase. (The "PH+MAG" mode outputs both phase and magnitude, in separate channels.) Finally, the visualization tab or window can receive TTL events and display the delayed but precise phase of a specified input at the event onset samples in a rose plot. This allows real-time monitoring of stimulation accuracy.
+![phase-calculator-screenshot](Resources/phase-calculator.png)
+
+Estimates the phase of a continuous input signal within a specified passband. Its primary purpose is to phase-specific closed-loop stimulation, typically in combination with the [Crossing Detector](https://github.com/open-ephys-plugins/crossing-detector).
+
+
+## Installation
+
+(Coming soon)
+
+## Usage
+
+* ***Important!*** Since the phase estimation algorithm is somewhat processor-intensive, by default only the first input channel of each stream is enabled. Use the "Channels" button to select additional channels as needed. Each selected channel will be transformed from an input signal into an estimate of the frequency-specific phase between -180 to +180.
+
+* In the `FREQ_RANGE` dropdown menu, choose a range of frequencies that includes the frequency band of interest. This determines which of the pre-designed Hilbert transformer filters is used internally (since if we tried to use one filter for all frequencies, it would end up with terrible performance everywhere). Note that the delta band is just too low to get a reasonably accurate phase estimate, even when downsampling to 500 Hz as this plugin does (before interpolating the output).
+
+* Use `LOW_CUT` and `HIGH_CUT` to select the desired frequency passband. (Inputs should be unfiltered; the Phase Calculator uses its own bandpass filter internally.) Changing the frequency range will automatically set a default high and low cut, but they can be changed to filter to any band within the range.
+
+* `AR_REFRESH` and `AR_ORDER` control the autoregressive model used to predict the "future" portion of the Hilbert buffer. AR parameters are estimated using Burg's method. The default settings seem to work well, but other settings (particularly lower orders) may also work well.
+
+* Clicking the tab or window button opens the "event phase plot" view. This allows non-real-time plotting of the precise phase of received TTL events on a channel of interest. All plot controls can be used while acquisition is running. "Phase reference" subtracts the input (in degrees) from all phases (in both the rose plot and the statistics).
+
+
+## Building from source
+
+First, follow the instructions on [this page](https://open-ephys.github.io/gui-docs/Developer-Guide/Compiling-the-GUI.html) to build the Open Ephys GUI.
+
+Next, install the [OpenEphysFFTW](https://github.com/open-ephys-plugins/OpenEphysFFTW) library.
+
+**Important:** This plugin is intended for use with the pre-release core application, version 0.6.0. The GUI should be compiled from the [`development-juce6`](https://github.com/open-ephys/plugin-gui/tree/development-juce6) branch, rather than the `master` branch.
+
+Then, clone this repository into a directory at the same level as the `plugin-GUI`, e.g.:
+ 
+```
+Code
+├── plugin-GUI
+│   ├── Build
+│   ├── Source
+│   └── ...
+├── OEPlugins
+│   └── phase-calculator
+│       ├── Build
+│       ├── Source
+│       └── ...
+```
+
+### Windows
+
+**Requirements:** [Visual Studio](https://visualstudio.microsoft.com/) and [CMake](https://cmake.org/install/)
+
+From the `Build` directory, enter:
+
+```bash
+cmake -G "Visual Studio 17 2022" -A x64 ..
+```
+
+Next, launch Visual Studio and open the `OE_PLUGIN_phase-calculator.sln` file that was just created. Select the appropriate configuration (Debug/Release) and build the solution.
+
+Selecting the `INSTALL` project and manually building it will copy the `.dll` and any other required files into the GUI's `plugins` directory. The next time you launch the GUI from Visual Studio, the Phase Calculator plugin should be available.
+
+
+### Linux
+
+**Requirements:** [CMake](https://cmake.org/install/)
+
+From the `Build` directory, enter:
+
+```bash
+cmake -G "Unix Makefiles" ..
+cd Debug
+make -j
+make install
+```
+
+This will build the plugin and copy the `.so` file into the GUI's `plugins` directory. The next time you launch the GUI compiled version of the GUI, the Phase Calculator plugin should be available.
+
+
+### macOS
+
+**Requirements:** [Xcode](https://developer.apple.com/xcode/) and [CMake](https://cmake.org/install/)
+
+From the `Build` directory, enter:
+
+```bash
+cmake -G "Xcode" ..
+```
+
+Next, launch Xcode and open the `phase-calculator.xcodeproj` file that now lives in the “Build” directory.
+
+Running the `ALL_BUILD` scheme will compile the plugin; running the `INSTALL` scheme will install the `.bundle` file to `/Users/<username>/Library/Application Support/open-ephys/plugins-api`. The Phase Calculator plugin should be available the next time you launch the GUI from Xcode.
+
+
+
+## Attribution
+
+This plugin was originally developed by [Ethan Blackwood](https://github.com/ethanbb) in the Translational NeuroEngineering Lab at the University of Minnesota. It is now maintained by the Allen Institute.
 
 The following article describes the algorithm used by the previous version of this plugin and the closed-loop stimulation pipeline as a whole:
 
 [Blackwood, E., Lo, M., Widge, A. S. (2018). Continuous phase estimation for phase-locked neural stimulation using an autoregressive model for signal prediction. 40th International Conference of the IEEE Engineering in Medicine and Biology Society (EMBC), Honolulu, HI, 4736-4739.](https://pubmed.ncbi.nlm.nih.gov/30441407/)
-
-If you are just using the plugin in your project, you can cite this version of the code using the DOI listed in the header of this file.
-
-<img src="Resources/ht_pc.png" width="200" /><img src="Resources/ht_pc_menu1.png" width="200"/><img src="Resources/ht_pc_menu2.png" width="200"/>
-<img src="Resources/PC_vis.png" width="350" />
-
-## Installation
-
-You must first install the "OpenEphysFFTW" common library, available [here](https://github.com/open-ephys-plugins/OpenEphysFFTW).
-
-See the wiki page [here](https://open-ephys.atlassian.net/wiki/spaces/OEW/pages/1259110401/Plugin+CMake+Builds) for build instructions.
-
-## Usage
-
-### Main functionality
-
-* ***Important!*** Since the phase estimation algorithm is somewhat processor-intensive, by default all input channels are disabled. To enable the channels you would like to estimate the phase (or other component) of, select them in the "PARAM" section of the drawer. If "PH+MAG" is selcected as the output, this will also create the additional magnitude outputs for each selected input.
-
-* In the "freq range" dropdown menu, choose a range of frequencies that includes the band you want to filter to. This determines which of the pre-designed Hilbert transformer filters is used internally (since if we tried to use one filter for all frequencies, it would end up with terrible performance everywhere). Note that the delta band is just too low to get a reasonably accurate phase estimate, even when downsampling to 500 Hz as this plugin does (before interpolating the output).
-
-* Use "Low cut" and "High cut" to select the desired frequency passband. (Inputs should be unfiltered; the Phase Calculator uses its own bandpass filter internally.) Changing the frequency range will automatically set a default high and low cut, but they can be changed to filter to any band within the range.
-
-* "AR Refresh" and "Order" control the autoregressive model used to predict the "future" portion of the Hilbert buffer. AR parameters are estimated using Burg's method. The default settings seem to work well, but other settings (particularly lower orders) may also work well.
-
-* "Output" allows selection of which component(s) of the analytic signal to output (for all enabled channels). If PH+MAG is selected, a magnitude (amplitude envelope) output channel is added to the outputs for each selected input channel; they appear in the ascending numerical order of their corresponding input/phase output channels. See `PC_ph+mag_demo.png` for an example of outputtng both phase and magnitude.
-
-### Event phase visualization
-
-Clicking the tab or window button opens the "event phase plot" view. This allows non-real-time plotting of the precise phase of received TTL events on a channel of interest. The data channel must be one that is selected for processing in the Phase Calculator "params" drawer, as the filtering step is shared between real-time phase estimation and event phase visualization. All plot controls can be used while acquisition is running. "Phase reference" subtracts the input (in degrees) from all phases (in both the rose plot and the statistics).
-
-I hope you find this to be useful!
--Ethan Blackwood ([ethanbb](https://github.com/ethanbb))
