@@ -2,7 +2,7 @@
 
 ![phase-calculator-screenshot](Resources/phase-calculator.png)
 
-Estimates the phase of a continuous input signal within a specified passband. Its primary purpose is to phase-specific closed-loop stimulation, typically in combination with the [Crossing Detector](https://github.com/open-ephys-plugins/crossing-detector).
+Estimates the phase of a continuous input signal within a specified passband. It can be used to perform phase-specific closed-loop stimulation, typically in combination with the [Crossing Detector](https://github.com/open-ephys-plugins/crossing-detector).
 
 
 ## Installation
@@ -11,13 +11,13 @@ Estimates the phase of a continuous input signal within a specified passband. It
 
 ## Usage
 
-* ***Important!*** Since the phase estimation algorithm is somewhat processor-intensive, by default only the first input channel of each stream is enabled. Use the "Channels" button to select additional channels as needed. Each selected channel will be transformed from an input signal into an estimate of the frequency-specific phase between -180 to +180.
+* ***Important!*** Since the phase estimation algorithm is somewhat processor-intensive, by default only the first input channel of each stream is enabled. Use the "Channels" button to select additional channels as needed. Each selected channel will be transformed from a continuously sampled sequence of voltages into an estimate of the frequency-specific phase between -180 to +180.
 
-* In the `FREQ_RANGE` dropdown menu, choose a range of frequencies that includes the frequency band of interest. This determines which of the pre-designed Hilbert transformer filters is used internally (since if we tried to use one filter for all frequencies, it would end up with terrible performance everywhere). Note that the delta band is just too low to get a reasonably accurate phase estimate, even when downsampling to 500 Hz as this plugin does (before interpolating the output).
+* In the `FREQ_RANGE` dropdown menu, select the general frequency range to analyze. This determines which of the pre-designed Hilbert transformer filters will be used internally. Note that frequencies below 4 Hz (delta band) are too low to calculate an accurate phase estimate.
 
-* Use `LOW_CUT` and `HIGH_CUT` to select the desired frequency passband. (Inputs should be unfiltered; the Phase Calculator uses its own bandpass filter internally.) Changing the frequency range will automatically set a default high and low cut, but they can be changed to filter to any band within the range.
+* Use `LOW_CUT` and `HIGH_CUT` to select the desired frequency passband. Changing the general frequency range will automatically set a default high and low cut, but they can be edited to filter to any band within the specified range.
 
-* `AR_REFRESH` and `AR_ORDER` control the autoregressive model used to predict the "future" portion of the Hilbert buffer. AR parameters are estimated using Burg's method. The default settings seem to work well, but other settings (particularly lower orders) may also work well.
+* `AR_REFRESH` and `AR_ORDER` control the autoregressive model used to predict the "future" portion of the Hilbert buffer. AR parameters are estimated using Burg's method. The default settings generally work well, but alternate values (particularly a lower order) may improve the estimate in certain cases.
 
 * Clicking the tab or window button opens the "event phase plot" view. This allows non-real-time plotting of the precise phase of received TTL events on a channel of interest. All plot controls can be used while acquisition is running. "Phase reference" subtracts the input (in degrees) from all phases (in both the rose plot and the statistics).
 
