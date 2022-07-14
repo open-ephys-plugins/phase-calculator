@@ -28,8 +28,6 @@ First, follow the instructions on [this page](https://open-ephys.github.io/gui-d
 
 Next, install the [OpenEphysFFTW](https://github.com/open-ephys-plugins/OpenEphysFFTW) library.
 
-**Important:** This plugin is intended for use with the pre-release core application, version 0.6.0. The GUI should be compiled from the [`development-juce6`](https://github.com/open-ephys/plugin-gui/tree/development-juce6) branch, rather than the `master` branch.
-
 Then, clone this repository into a directory at the same level as the `plugin-GUI`, e.g.:
  
 ```
