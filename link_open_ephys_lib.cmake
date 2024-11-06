@@ -17,8 +17,10 @@ function(link_open_ephys_lib target libname)
 
 		set(LIB_PATH_${CONFIG} ${libname}-NOTFOUND) # force re-search
 
-		find_library(LIB_PATH_${CONFIG} NAMES ${libname}
-			PATHS ${GUI_COMMONLIB_DIR}/${config}/lib/${CMAKE_LIBRARY_ARCHITECTURE})
+		find_library(LIB_PATH_${CONFIG} 
+			NAMES ${libname}
+			PATHS ${GUI_COMMONLIB_DIR}/${config}/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+			NO_DEFAULT_PATH)
 
 		if (LIB_PATH_${CONFIG})
 			set_target_properties(${libname} PROPERTIES ${LIBLOC}_${CONFIG} ${LIB_PATH_${CONFIG}})

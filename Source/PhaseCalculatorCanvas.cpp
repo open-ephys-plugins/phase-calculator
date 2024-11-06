@@ -27,7 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 namespace PhaseCalculator
 {
     Canvas::Canvas(Node* pc)
-        : processor(pc)
+        : Visualizer ((GenericProcessor*)pc)
+        , processor(pc)
         , viewport(new Viewport())
         , canvas(new Component("canvas"))
         , rosePlotOptions(new Component("rosePlotOptions"))
@@ -35,33 +36,34 @@ namespace PhaseCalculator
     {
         refreshRate = 5;
 
-        canvas->addAndMakeVisible(rosePlot);
+        canvas->addAndMakeVisible(rosePlot.get());
 
         // populate rosePlotOptions
-        const Font textFont = Font(18, Font::bold);
+        const Font textFont = FontOptions("Inter", "Semi Bold", 18.0f);
         const int textHeight = 25;
         const int indent = 10;
         int xPos = indent;
         int yPos = 10;
 
-        cChannelLabel = new Label("cChannelLabel", "Data channel:");
+        cChannelLabel = std::make_unique<Label>("cChannelLabel", "Data channel:");
         cChannelLabel->setBounds(xPos, yPos, 120, textHeight);
         cChannelLabel->setFont(textFont);
-        rosePlotOptions->addAndMakeVisible(cChannelLabel);
+        rosePlotOptions->addAndMakeVisible(cChannelLabel.get());
 
-        eChannelLabel = new Label("eChannelLabel", "Event channel:");
-        eChannelLabel->setBounds(xPos += 140, yPos, 120, textHeight);
-        eChannelLabel->setFont(textFont);
-        rosePlotOptions->addAndMakeVisible(eChannelLabel);
-
-        cChannelBox = new ComboBox("cChannelBox");
+        cChannelBox = std::make_unique<ComboBox>("cChannelBox");
         cChannelBox->setTooltip(cChanTooltip);
-        cChannelBox->setBounds(xPos = indent + 20, yPos += textHeight + 2, 80, textHeight);
+        cChannelBox->setBounds(xPos, yPos += textHeight + 2, 80, textHeight);
         cChannelBox->addListener(this);
-        rosePlotOptions->addAndMakeVisible(cChannelBox);
+        rosePlotOptions->addAndMakeVisible(cChannelBox.get());
 
-        eChannelBox = new ComboBox("eChannelBox");
-        eChannelBox->setBounds(xPos += 140, yPos, 80, textHeight);
+        eChannelLabel = std::make_unique<Label>("eChannelLabel", "Event Line:");
+        eChannelLabel->setBounds(xPos += 140, yPos = indent, 120, textHeight);
+        eChannelLabel->setFont(textFont);
+        rosePlotOptions->addAndMakeVisible(eChannelLabel.get());
+
+
+        eChannelBox = std::make_unique<ComboBox>("eChannelBox");
+        eChannelBox->setBounds(xPos, yPos += textHeight + 2, 80, textHeight);
         eChannelBox->addItem("None", 1);
         for (int chan = 1; chan <= 8; ++chan)
         {
@@ -69,69 +71,71 @@ namespace PhaseCalculator
         }
         eChannelBox->setSelectedId(1, dontSendNotification);
         eChannelBox->addListener(this);
-        rosePlotOptions->addAndMakeVisible(eChannelBox);
+        rosePlotOptions->addAndMakeVisible(eChannelBox.get());
 
-        numBinsLabel = new Label("numBinsLabel", "Number of bins:");
+        numBinsLabel = std::make_unique<Label>("numBinsLabel", "Number of bins:");
         numBinsLabel->setBounds(xPos = indent, yPos += 2 * textHeight, 200, textHeight);
         numBinsLabel->setFont(textFont);
-        rosePlotOptions->addAndMakeVisible(numBinsLabel);
+        rosePlotOptions->addAndMakeVisible(numBinsLabel.get());
 
-        numBinsSlider = new Slider();
-        numBinsSlider->setTextBoxStyle(Slider::TextBoxBelow, false, 40, 30);
-        numBinsSlider->setBounds(xPos, yPos += textHeight + 2, optionsWidth - 2 * indent, 40);
+        numBinsSlider = std::make_unique<Slider>();
+        numBinsSlider->setSliderStyle(Slider::LinearHorizontal);
+        numBinsSlider->setTextBoxStyle(Slider::TextBoxBelow, false, 40, 25);
+        numBinsSlider->setBounds(xPos, yPos += textHeight + 2, optionsWidth - 2 * indent, 50);
         numBinsSlider->setRange(1, RosePlot::maxBins, 1);
         numBinsSlider->setValue(RosePlot::startNumBins);
         numBinsSlider->addListener(this);
-        rosePlotOptions->addAndMakeVisible(numBinsSlider);
+        rosePlotOptions->addAndMakeVisible(numBinsSlider.get());
 
-        clearButton = new UtilityButton("Clear Plot", Font(20, Font::bold));
+        clearButton = std::make_unique<UtilityButton>("Clear Plot");
+        clearButton->setFont (FontOptions(16.0f));
         clearButton->addListener(this);
         clearButton->setBounds((optionsWidth - 80) / 2, yPos += 55, 80, 30);
-        rosePlotOptions->addAndMakeVisible(clearButton);
+        rosePlotOptions->addAndMakeVisible(clearButton.get());
 
-        referenceLabel = new Label("referenceLabel", "Phase reference:");
-        referenceLabel->setBounds(xPos = indent, yPos += 45, 160, textHeight);
+        referenceLabel = std::make_unique<Label>("referenceLabel", "Phase reference:");
+        int refLabelWidth = GlyphArrangement::getStringWidth(textFont, referenceLabel->getText());
+        referenceLabel->setBounds(xPos = indent, yPos += 45, refLabelWidth, textHeight);
         referenceLabel->setFont(textFont);
-        rosePlotOptions->addAndMakeVisible(referenceLabel);
+        rosePlotOptions->addAndMakeVisible(referenceLabel.get());
 
-        referenceEditable = new Label("referenceEditable", String(RosePlot::startReference));
+        referenceEditable = std::make_unique<CustomTextBox>("referenceEditable", String(RosePlot::startReference), "0123456789");
         referenceEditable->setEditable(true);
-        referenceEditable->addListener(rosePlot);
-        referenceEditable->setBounds(xPos += 160, yPos, 60, textHeight);
-        referenceEditable->setColour(Label::backgroundColourId, Colours::darkgrey);
-        referenceEditable->setColour(Label::textColourId, Colours::white);
+        referenceEditable->addListener(rosePlot.get());
+        referenceEditable->setBounds(xPos += refLabelWidth + 5, yPos, 60, textHeight);
         referenceEditable->setTooltip(refTooltip);
-        rosePlotOptions->addAndMakeVisible(referenceEditable);
+        rosePlotOptions->addAndMakeVisible(referenceEditable.get());
 
-        countLabel = new Label("countLabel");
+        countLabel = std::make_unique<Label>("countLabel");
         countLabel->setBounds(xPos = indent, yPos += 45, optionsWidth, textHeight);
         countLabel->setFont(textFont);
 
-        meanLabel = new Label("meanLabel");
+        meanLabel = std::make_unique<Label>("meanLabel");
         meanLabel->setBounds(xPos, yPos += textHeight, optionsWidth, textHeight);
         meanLabel->setFont(textFont);
 
-        stdLabel = new Label("stdLabel");
+        stdLabel = std::make_unique<Label>("stdLabel");
         stdLabel->setBounds(xPos, yPos += textHeight, optionsWidth, textHeight);
         stdLabel->setFont(textFont);
 
         updateStatLabels();
-        rosePlotOptions->addAndMakeVisible(countLabel);
-        rosePlotOptions->addAndMakeVisible(meanLabel);
-        rosePlotOptions->addAndMakeVisible(stdLabel);
+        rosePlotOptions->addAndMakeVisible(countLabel.get());
+        rosePlotOptions->addAndMakeVisible(meanLabel.get());
+        rosePlotOptions->addAndMakeVisible(stdLabel.get());
 
-        canvas->addAndMakeVisible(rosePlotOptions);
+        canvas->addAndMakeVisible(rosePlotOptions.get());
 
-        viewport->setViewedComponent(canvas, false);
+        viewport->setViewedComponent(canvas.get(), false);
         viewport->setScrollBarsShown(true, true);
-        addAndMakeVisible(viewport);
+        viewport->setScrollBarThickness(12);
+        addAndMakeVisible(viewport.get());
     }
 
     Canvas::~Canvas() {}
 
     void Canvas::paint(Graphics& g)
     {
-        g.fillAll(Colours::grey);
+        g.fillAll(findColour(ThemeColours::componentBackground));
     }
 
     void Canvas::resized()
@@ -178,7 +182,7 @@ namespace PhaseCalculator
 
     void Canvas::refreshState() {}
 
-    void Canvas::update()
+    void Canvas::updateSettings()
     {
         if(processor->getSelectedStream() != 0)
         {
@@ -250,13 +254,13 @@ namespace PhaseCalculator
     void Canvas::comboBoxChanged(ComboBox* comboBoxThatHasChanged)
     {
         DataStream* currStream = processor->getDataStream(processor->getSelectedStream());
-        if (comboBoxThatHasChanged == cChannelBox)
+        if (comboBoxThatHasChanged == cChannelBox.get())
         {
             // subtract 1 to change from 1-based to 0-based
             int newValue = cChannelBox->getSelectedId() - 1;
             currStream->getParameter("vis_cont")->setNextValue(newValue);
         }
-        else if (comboBoxThatHasChanged == eChannelBox)
+        else if (comboBoxThatHasChanged == eChannelBox.get())
         {
             // subtract 2, since index 1 == no channel (-1)
             int newValue = eChannelBox->getSelectedId() - 2;
@@ -266,7 +270,7 @@ namespace PhaseCalculator
 
     void Canvas::sliderValueChanged(Slider* slider)
     {
-        if (slider == numBinsSlider)
+        if (slider == numBinsSlider.get())
         {
             rosePlot->setNumBins(static_cast<int>(slider->getValue()));
         }
@@ -274,7 +278,7 @@ namespace PhaseCalculator
 
     void Canvas::buttonClicked(Button* button)
     {
-        if (button == clearButton)
+        if (button == clearButton.get())
         {
             clearAngles();
         }
@@ -331,9 +335,6 @@ namespace PhaseCalculator
         : canvas(c)
         , referenceAngle(static_cast<double>(startReference))
         , numBins(startNumBins)
-        , faceColor(Colour(230, 168, 0))
-        , edgeColor(Colours::black)
-        , bgColor(Colours::black)
         , edgeWeight(1)
         , rSum(0)
     {
@@ -350,7 +351,7 @@ namespace PhaseCalculator
         float squareSide = jmin(bounds.getHeight(), bounds.getWidth() - 2 * textBoxSize);
         juce::Rectangle<float> plotBounds = bounds.withZeroOrigin();
         plotBounds = plotBounds.withSizeKeepingCentre(squareSide, squareSide);
-        g.setColour(bgColor);
+        g.setColour(findColour(ThemeColours::widgetBackground));
         g.fillEllipse(plotBounds);
 
         // draw grid
@@ -363,20 +364,20 @@ namespace PhaseCalculator
         {
             float juceAngle = i * float_Pi / 6;
             spoke.setEnd(center.getPointOnCircumference(squareSide / 2, juceAngle));
-            g.setColour(Colours::lightgrey);
+            g.setColour(findColour(ThemeColours::defaultFill));
             g.drawLine(spoke);
 
             float textRadius = (squareSide + textBoxSize) / 2;
             juce::Point<int> textCenter = center.getPointOnCircumference(textRadius, juceAngle).toInt();
             int degreeAngle = (450 - 30 * i) % 360;
-            g.setColour(Colours::black);
+            g.setColour(findColour(ThemeColours::defaultText));
             g.drawFittedText(String(degreeAngle), textBox.withCentre(textCenter), Justification::centred, 1);
         }
 
         // concentric circles
         int nCircles = 3;
         juce::Rectangle<float> circleBounds;
-        g.setColour(Colours::lightgrey);
+        g.setColour(findColour(ThemeColours::defaultFill));
         for (int i = 1; i < nCircles; ++i)
         {
             float diameter = (squareSide * i) / nCircles;
@@ -416,9 +417,9 @@ namespace PhaseCalculator
         }
 
         // paint path
-        g.setColour(faceColor);
+        g.setColour(findColour(ThemeColours::highlightedFill));
         g.fillPath(rosePath);
-        g.setColour(edgeColor);
+        g.setColour(findColour(ThemeColours::widgetBackground));
         g.strokePath(rosePath, PathStrokeType(edgeWeight));
     }
 
@@ -534,7 +535,7 @@ namespace PhaseCalculator
 
     void RosePlot::reorganizeAngleData()
     {
-        ScopedPointer<AngleDataMultiset> newAngleData;
+        AngleDataMultiset* newAngleData;
         if (angleData == nullptr)
         {
             // construct empty container
@@ -546,7 +547,7 @@ namespace PhaseCalculator
             newAngleData = new AngleDataMultiset(numBins, referenceAngle, angleData.get());
         }
 
-        angleData.swapWith(newAngleData);
+        angleData.reset(newAngleData);
     }
 
     void RosePlot::updateAngles()

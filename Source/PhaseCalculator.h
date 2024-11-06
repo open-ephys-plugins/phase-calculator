@@ -42,6 +42,8 @@ accuracy of phase-locked stimulation in real time.
 
 */
 
+#define PROCESSOR_NAME "Phase Calculator"
+
 #include <ProcessorHeaders.h>
 #include <DspLib.h>           // Filtering
 #include <OpenEphysFFTW.h>    // Fourier transform
@@ -291,6 +293,9 @@ namespace PhaseCalculator
 
         /** Destructor */
         ~Node() { }
+
+        /** Register parameters */
+        void registerParameters() override;
 
         /** Creates the PhaseCalculatorEditor */
         AudioProcessorEditor* createEditor() override;

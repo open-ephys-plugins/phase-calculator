@@ -412,40 +412,49 @@ namespace PhaseCalculator
         : GenericProcessor("Phase Calculator")
         , Thread("AR Modeler")
     {
-        setProcessorType(Plugin::Processor::FILTER);
-
         selectedStream = 0;
         activeChansNeedsUpdate = true;
+    }
 
-        StringArray bands;
-        for (int b = 0; b < NUM_BANDS - 1; ++b)
+    void Node::registerParameters()
+    {
+        Array<String> bands;
+        for (int b = 0; b < NUM_BANDS; ++b)
             bands.add(Hilbert::bandName[b]);
 
         addCategoricalParameter(Parameter::STREAM_SCOPE, 
-                                "freq_range", 
+                                "freq_range",
+                                "Freq. Range",
                                 "Each option corresponds internally to a Hilbert transformer that is optimized for this frequency range."
                                 + String("After selecting a range, you can adjust ") +
                                 "'low' and 'high' to filter to any passband within this range.",
-                                bands, 0 );
+                                bands, 0);
 
         String desc;
 
         const Array<float>& defaultBand = Hilbert::defaultBand[0];
-        
-        addFloatParameter(Parameter::STREAM_SCOPE, "low_cut", "Low Cut", defaultBand[0], 0.0f, 1000.0f, 1.0f);
-        
-        addFloatParameter(Parameter::STREAM_SCOPE, "high_cut", "High Cut", defaultBand[1], 0.0f, 1000.0f, 1.0f);
-        
-        desc = "Time to wait between calls to update the autoregressive models"; 
-        addIntParameter(Parameter::STREAM_SCOPE, "ar_refresh", desc, 50, 0, 10000);
-        
-        desc = "Order of the autoregressive models used to predict future data";
-        addIntParameter(Parameter::STREAM_SCOPE, "ar_order", desc, 20, 1, 1000);
-        
-        addSelectedChannelsParameter(Parameter::STREAM_SCOPE, "Channels", "Selectable Channels", std::numeric_limits<int>::max());
 
-        addIntParameter(Parameter::STREAM_SCOPE, "vis_cont", "Phase calculation channel", -1, -1, 1000);
-        addIntParameter(Parameter::STREAM_SCOPE, "vis_event", "Event channel to plot phases", -1, -1, 1000);
+        addFloatParameter(Parameter::STREAM_SCOPE, "low_cut", "Low Cut", "Modify filter low cutoff", "Hz", defaultBand[0], 0.0f, 1000.0f, 1.0f);
+        
+        addFloatParameter(Parameter::STREAM_SCOPE, "high_cut", "High Cut", "Modify filter high cutoff", "Hz", defaultBand[1], 0.0f, 1000.0f, 1.0f);
+
+        desc = "Time to wait between calls to update the autoregressive models"; 
+        addIntParameter(Parameter::STREAM_SCOPE, "ar_refresh", "AR Refresh", desc, 50, 0, 10000);
+
+        desc = "Order of the autoregressive models used to predict future data";
+        addIntParameter(Parameter::STREAM_SCOPE, "ar_order", "AR Order", desc, 20, 1, 1000);
+
+        // Create a SelectedChannelsParameter with the first channel selected by default
+        SelectedChannelsParameter* chansParam = new SelectedChannelsParameter(nullptr, 
+                                                                              Parameter::STREAM_SCOPE,
+                                                                              "Channels",
+                                                                              "Channels",
+                                                                              "Select channels to analyze",
+                                                                              Array<var>({ 0 }));
+        dataStreamParameters.add(chansParam);
+
+        addIntParameter(Parameter::STREAM_SCOPE, "vis_cont", "Continuous Channel", "Phase calculation channel", -1, -1, 1000);
+        addIntParameter(Parameter::STREAM_SCOPE, "vis_event", "Event Line", "Event line to plot phases", -1, -1, 1000);
     }
 
 
@@ -623,7 +632,7 @@ namespace PhaseCalculator
             }
 
             activeChansNeedsUpdate = true;
-            startThread(arPriority);
+            this->startThread();
 
             // have to manually enable editor, I guess...
             Editor* editor = static_cast<Editor*>(getEditor());
@@ -638,7 +647,7 @@ namespace PhaseCalculator
         Editor* editor = static_cast<Editor*>(getEditor());
         editor->disable();
 
-        signalThreadShouldExit();
+        stopThread(2000);
 
         // reset states of active inputs
         for(auto stream : getDataStreams())
@@ -754,7 +763,7 @@ namespace PhaseCalculator
         juce::uint16 paramStreamId = param->getStreamId();
         auto stream = getDataStream(paramStreamId);
 
-        LOGD("[PhaseCalc] Parameter value changed ", paramStreamId, " : ", param->getName(), " : ", (int)param->getValue());
+        LOGD("[PhaseCalc] Parameter value changed ", paramStreamId, " : ", param->getName(), " : ", param->getValue().toString());
 
         if (param->getName().equalsIgnoreCase("Channels"))
         {   
@@ -784,12 +793,12 @@ namespace PhaseCalculator
                 }
             }
 
-            setSelectedStream(paramStreamId);
+            activeChansNeedsUpdate = true;
 
             if(paramNeedsUpdate)
             {
                 param->currentValue = paramValue;
-                getEditor()->updateView();
+                param->valueChanged();
             }
 
             getEditor()->updateVisualizer();
@@ -801,8 +810,8 @@ namespace PhaseCalculator
 
             if(stream->getParameter("low_cut") != nullptr && stream->getParameter("high_cut") != nullptr)
             {
-                stream->getParameter("low_cut")->setNextValue(settings[paramStreamId]->lowCut);
-                stream->getParameter("high_cut")->setNextValue(settings[paramStreamId]->highCut);
+                stream->getParameter("low_cut")->setNextValue(settings[paramStreamId]->lowCut, false);
+                stream->getParameter("high_cut")->setNextValue(settings[paramStreamId]->highCut, false);
                 settings[paramStreamId]->updateActiveChannels();
             }
         }

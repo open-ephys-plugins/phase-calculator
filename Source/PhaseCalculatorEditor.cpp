@@ -30,24 +30,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 namespace PhaseCalculator
 {
     Editor::Editor(Node* parentNode)
-        : VisualizerEditor(parentNode, "Event Phase Plot", 300)
+        : VisualizerEditor(parentNode, "Event Phase Plot", 310)
     {
-        int filterWidth = 105;
-
         // make the canvas now, so that restoring its parameters always works.
         canvas = std::make_unique<Canvas>(parentNode);
 
-        addComboBoxParameterEditor("freq_range", 10, 30);
+        addComboBoxParameterEditor(Parameter::STREAM_SCOPE, "freq_range", 10, 25);
 
-        addTextBoxParameterEditor("low_cut", filterWidth, 25);
+        addTextBoxParameterEditor(Parameter::STREAM_SCOPE, "low_cut", 110, 25);
 
-        addTextBoxParameterEditor("high_cut", filterWidth, 75);
+        addTextBoxParameterEditor(Parameter::STREAM_SCOPE, "high_cut", 110, 75);
 
-        addTextBoxParameterEditor("ar_refresh", filterWidth + 90, 25);
+        addTextBoxParameterEditor(Parameter::STREAM_SCOPE, "ar_refresh", 210, 25);
 
-        addTextBoxParameterEditor("ar_order", filterWidth + 90, 75);
+        addTextBoxParameterEditor(Parameter::STREAM_SCOPE, "ar_order", 210, 75);
 
-        addSelectedChannelsParameterEditor("Channels", 10, 90);
+        addSelectedChannelsParameterEditor(Parameter::STREAM_SCOPE, "Channels", 10, 75);
+
+        for (auto ed : parameterEditors)
+        {
+            ed->setLayout(ParameterEditor::Layout::nameOnTop);
+            ed->setSize (90, 40);
+        }
 
     }
 

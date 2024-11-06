@@ -97,7 +97,7 @@ namespace PhaseCalculator
 
         Canvas* canvas;
 
-        ScopedPointer<AngleDataMultiset> angleData;
+        std::unique_ptr<AngleDataMultiset> angleData;
         int numBins;
         double referenceAngle;
 
@@ -107,9 +107,6 @@ namespace PhaseCalculator
         // inputs to addPieSegment (clockwise from top)
         Array<std::pair<float, float>> segmentAngles;
 
-        Colour faceColor;
-        Colour edgeColor;
-        Colour bgColor;
         float edgeWeight;
 
         // sum of exp(a*j) for each angle a
@@ -132,7 +129,7 @@ namespace PhaseCalculator
         /** Destructor */
         ~Canvas();
         void refreshState() override;
-        void update() override;
+        void updateSettings() override;
         void refresh() override;
 
         void paint(Graphics& g) override;
@@ -171,28 +168,28 @@ namespace PhaseCalculator
         // to swap with the queue of phases from the Node
         std::queue<double> tempPhaseBuffer;
 
-        ScopedPointer<Viewport>  viewport;
-        ScopedPointer<Component> canvas;
-        ScopedPointer<Component> rosePlotOptions;
-        ScopedPointer<RosePlot>  rosePlot;
+        std::unique_ptr<Viewport>  viewport;
+        std::unique_ptr<Component> canvas;
+        std::unique_ptr<Component> rosePlotOptions;
+        std::unique_ptr<RosePlot>  rosePlot;
 
         // options panel
-        ScopedPointer<Label>     cChannelLabel;
-        ScopedPointer<ComboBox>  cChannelBox;
-        ScopedPointer<Label>     eChannelLabel;
-        ScopedPointer<ComboBox>  eChannelBox;
+        std::unique_ptr<Label>     cChannelLabel;
+        std::unique_ptr<ComboBox>  cChannelBox;
+        std::unique_ptr<Label>     eChannelLabel;
+        std::unique_ptr<ComboBox>  eChannelBox;
 
-        ScopedPointer<Label>  numBinsLabel;
-        ScopedPointer<Slider> numBinsSlider;
+        std::unique_ptr<Label>  numBinsLabel;
+        std::unique_ptr<Slider> numBinsSlider;
 
-        ScopedPointer<UtilityButton> clearButton;
+        std::unique_ptr<UtilityButton> clearButton;
 
-        ScopedPointer<Label> referenceLabel;
-        ScopedPointer<Label> referenceEditable;
+        std::unique_ptr<Label> referenceLabel;
+        std::unique_ptr<CustomTextBox> referenceEditable;
 
-        ScopedPointer<Label> countLabel;
-        ScopedPointer<Label> meanLabel;
-        ScopedPointer<Label> stdLabel;
+        std::unique_ptr<Label> countLabel;
+        std::unique_ptr<Label> meanLabel;
+        std::unique_ptr<Label> stdLabel;
 
         static const int minPadding = 5;
         static const int maxLeftPadding = 50;
