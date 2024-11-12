@@ -740,6 +740,8 @@ namespace PhaseCalculator
 
     void Node::updateSettings()
     {
+        selectedStream = 0;
+
         settings.update(getDataStreams());
 
         for (auto stream : getDataStreams())
