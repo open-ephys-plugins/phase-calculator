@@ -94,7 +94,7 @@ namespace PhaseCalculator
         rosePlotOptions->addAndMakeVisible(clearButton.get());
 
         referenceLabel = std::make_unique<Label>("referenceLabel", "Phase reference:");
-        int refLabelWidth = GlyphArrangement::getStringWidth(textFont, referenceLabel->getText());
+        int refLabelWidth = textFont.getStringWidth(referenceLabel->getText());
         referenceLabel->setBounds(xPos = indent, yPos += 45, refLabelWidth, textHeight);
         referenceLabel->setFont(textFont);
         rosePlotOptions->addAndMakeVisible(referenceLabel.get());
