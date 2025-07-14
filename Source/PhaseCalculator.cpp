@@ -155,7 +155,7 @@ namespace PhaseCalculator
             arOrder + 1,
             1 * Hilbert::fs);
 
-        LOGC("PhaseCalculator: Resetting history size");
+        LOGD("PhaseCalculator: Resetting history size");
         history.resetAndResize(newHistorySize);
 
         // set filter parameters
@@ -168,16 +168,16 @@ namespace PhaseCalculator
                 highCut - lowCut);      // bandwidth
         }
 
-        LOGC("PhaseCalculator: Setting filter parameters");
+        LOGD("PhaseCalculator: Setting filter parameters");
         arModeler.setParams(arOrder, newHistorySize, chanInfo->dsFactor);
 
-        LOGC("PhaseCalculator: Resizing hilbert state");
+        LOGD("PhaseCalculator: Resizing hilbert state");
         htState.resize(Hilbert::delay[band] * 2 + 1);
 
         // visualization stuff
         hilbertLengthMultiplier = Hilbert::fs * chanInfo->dsFactor / 1000;
 
-        LOGC("PhaseCalculator: Resizing visualization buffer to ", visHilbertLengthMs * hilbertLengthMultiplier);
+        LOGD("PhaseCalculator: Resizing visualization buffer to ", visHilbertLengthMs * hilbertLengthMultiplier);
 
         if (bufferResizeThread->isThreadRunning())
         {
@@ -187,7 +187,7 @@ namespace PhaseCalculator
         bufferResizeThread->startThread();
         bufferResizeThread->waitForThreadToExit(10000);
 
-        LOGC("PhaseCalculator: Resetting info");
+        LOGD("PhaseCalculator: Resetting info");
         reset();
     }
 
@@ -468,10 +468,7 @@ namespace PhaseCalculator
     void Node::process(AudioBuffer<float>& buffer)
     {
 
-        // check for events to visualize
-        bool hasCanvas = static_cast<Editor*>(getEditor())->canvas != nullptr;
-
-        if (hasCanvas && settings[selectedStream]->visEventChannel > -1)
+        if (settings[selectedStream]->visEventChannel > -1)
         {
             checkForEvents();
         }
@@ -603,11 +600,10 @@ namespace PhaseCalculator
                     }
 
                     // if this is the monitored channel for events, check whether we can add a new phase
-                    if (hasCanvas
-                        && chanInfo->chan == settings[stream->getStreamId()]->visContinuousChannel
+                    if (chanInfo->chan == settings[stream->getStreamId()]->visContinuousChannel
                         && acInfo->history.isFull())
                     {
-                        calcVisPhases(acInfo, getFirstSampleNumberForBlock(stream->getStreamId()));
+                        calcVisPhases(acInfo, getFirstSampleNumberForBlock(stream->getStreamId()) + nSamples);
                     }
                 }
             }
@@ -755,6 +751,13 @@ namespace PhaseCalculator
             }
 
             parameterValueChanged(stream->getParameter("Channels"));
+            parameterValueChanged(stream->getParameter("freq_range"));
+            parameterValueChanged(stream->getParameter("low_cut"));
+            parameterValueChanged(stream->getParameter("high_cut"));
+            parameterValueChanged(stream->getParameter("ar_refresh"));
+            parameterValueChanged(stream->getParameter("ar_order"));
+            parameterValueChanged(stream->getParameter("vis_event"));
+            settings[stream->getStreamId()]->visContinuousChannel = (int)stream->getParameter("vis_cont")->getValue();
         }
 
     }
@@ -935,7 +938,7 @@ namespace PhaseCalculator
         if (event->getEventType() == EventChannel::TTL)
         {
             if (event->getStreamId() == selectedStream
-                && event->getLine() == settings[selectedStream]->visEventChannel
+                && (int)event->getLine() == settings[selectedStream]->visEventChannel
                 && event->getState())
             {
                 // add timestamp to the queue for visualization
