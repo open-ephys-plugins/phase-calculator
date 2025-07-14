@@ -44,39 +44,39 @@ Defines the Hilbert transformers appropriate to use for each frequency band.
 
 namespace PhaseCalculator
 {
-    enum Band
-    {
-        ALPHA_THETA = 0,
-        BETA,
-        LOW_GAM,
-        MID_GAM,
-        HIGH_GAM,
-        NUM_BANDS
-    };
+enum Band
+{
+    ALPHA_THETA = 0,
+    BETA,
+    LOW_GAM,
+    MID_GAM,
+    HIGH_GAM,
+    NUM_BANDS
+};
 
-    namespace Hilbert
-    {
-        const int fs = 500;
+namespace Hilbert
+{
+    const int fs = 500;
 
-        // Each pointer below points to an array of length NUM_BANDS.
+    // Each pointer below points to an array of length NUM_BANDS.
 
-        extern const String* const bandName;
+    extern const String* const bandName;
 
-        /** each is a pair (lower limit, upper limit) */
-        extern const Array<float>* const validBand;
+    /** each is a pair (lower limit, upper limit) */
+    extern const Array<float>* const validBand;
 
-        /** each is a pair (low cut, high cut) */
-        extern const Array<float>* const defaultBand;
+    /** each is a pair (low cut, high cut) */
+    extern const Array<float>* const defaultBand;
 
-        /** Locations of local extrema of the magnitude response within VALID_BAND*/
-        extern const Array<float>* const extrema;
+    /** Locations of local extrema of the magnitude response within VALID_BAND*/
+    extern const Array<float>* const extrema;
 
-        /** Samples of group delay (= order of filter / 2) */
-        extern const int* const delay;
+    /** Samples of group delay (= order of filter / 2) */
+    extern const int* const delay;
 
-        /** Contains the first delay[band] coefficients; the rest are redundant and can be inferred */
-        extern const Array<double>* const transformer;
-    }
-}
+    /** Contains the first delay[band] coefficients; the rest are redundant and can be inferred */
+    extern const Array<double>* const transformer;
+} // namespace Hilbert
+} // namespace PhaseCalculator
 
 #endif // H_TRANSFORMERS_H_INCLUDED

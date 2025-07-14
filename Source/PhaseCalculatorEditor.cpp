@@ -21,55 +21,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "PhaseCalculatorEditor.h"
-#include "PhaseCalculatorCanvas.h"
 #include "HTransformers.h"
+#include "PhaseCalculatorCanvas.h"
+#include <cfloat> // FLT_MAX
 #include <climits> // INT_MAX
-#include <cfloat>  // FLT_MAX
-#include <cmath>   // abs
+#include <cmath> // abs
 
 namespace PhaseCalculator
 {
-    Editor::Editor(Node* parentNode)
-        : VisualizerEditor(parentNode, "Event Phase Plot", 310)
+Editor::Editor (Node* parentNode)
+    : VisualizerEditor (parentNode, "Event Phase Plot", 310)
+{
+    // make the canvas now, so that restoring its parameters always works.
+    canvas = std::make_unique<Canvas> (parentNode);
+
+    addComboBoxParameterEditor (Parameter::STREAM_SCOPE, "freq_range", 10, 25);
+
+    addTextBoxParameterEditor (Parameter::STREAM_SCOPE, "low_cut", 110, 25);
+
+    addTextBoxParameterEditor (Parameter::STREAM_SCOPE, "high_cut", 110, 75);
+
+    addTextBoxParameterEditor (Parameter::STREAM_SCOPE, "ar_refresh", 210, 25);
+
+    addTextBoxParameterEditor (Parameter::STREAM_SCOPE, "ar_order", 210, 75);
+
+    addSelectedChannelsParameterEditor (Parameter::STREAM_SCOPE, "Channels", 10, 75);
+
+    for (auto ed : parameterEditors)
     {
-        // make the canvas now, so that restoring its parameters always works.
-        canvas = std::make_unique<Canvas>(parentNode);
-
-        addComboBoxParameterEditor(Parameter::STREAM_SCOPE, "freq_range", 10, 25);
-
-        addTextBoxParameterEditor(Parameter::STREAM_SCOPE, "low_cut", 110, 25);
-
-        addTextBoxParameterEditor(Parameter::STREAM_SCOPE, "high_cut", 110, 75);
-
-        addTextBoxParameterEditor(Parameter::STREAM_SCOPE, "ar_refresh", 210, 25);
-
-        addTextBoxParameterEditor(Parameter::STREAM_SCOPE, "ar_order", 210, 75);
-
-        addSelectedChannelsParameterEditor(Parameter::STREAM_SCOPE, "Channels", 10, 75);
-
-        for (auto ed : parameterEditors)
-        {
-            ed->setLayout(ParameterEditor::Layout::nameOnTop);
-            ed->setSize (90, 40);
-        }
-
-    }
-
-    Editor::~Editor() {}
-
-
-    Visualizer* Editor::createNewCanvas()
-    {
-        return canvas.get();
-    }
-
-    void Editor::selectedStreamHasChanged()
-    {
-        LOGD("[PhaseCalc] Selected stream has changed to: ", getCurrentStream());
-        Node* processor = (Node*)getProcessor();
-        processor->setSelectedStream(getCurrentStream());
-
-        // inform the canvas about selected stream updates
-        updateVisualizer();
+        ed->setLayout (ParameterEditor::Layout::nameOnTop);
+        ed->setSize (90, 40);
     }
 }
+
+Editor::~Editor() {}
+
+Visualizer* Editor::createNewCanvas()
+{
+    return canvas.get();
+}
+
+void Editor::selectedStreamHasChanged()
+{
+    LOGD ("[PhaseCalc] Selected stream has changed to: ", getCurrentStream());
+    Node* processor = (Node*) getProcessor();
+    processor->setSelectedStream (getCurrentStream());
+
+    // inform the canvas about selected stream updates
+    updateVisualizer();
+}
+} // namespace PhaseCalculator

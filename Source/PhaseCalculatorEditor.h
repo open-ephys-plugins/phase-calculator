@@ -20,32 +20,31 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #ifndef PHASE_CALCULATOR_EDITOR_H_INCLUDED
 #define PHASE_CALCULATOR_EDITOR_H_INCLUDED
 
-#include <sstream>  // string parsing
 #include <VisualizerEditorHeaders.h>
+#include <sstream> // string parsing
 
 #include "PhaseCalculator.h"
 
 namespace PhaseCalculator
 {
-    class Editor
-        : public VisualizerEditor
-    {
-        friend class RosePlot;  // to access label updating method
-    public:
-        Editor(Node* parentNode);
-        ~Editor();
+class Editor
+    : public VisualizerEditor
+{
+    friend class RosePlot; // to access label updating method
+public:
+    Editor (Node* parentNode);
+    ~Editor();
 
-        Visualizer* createNewCanvas() override;
+    Visualizer* createNewCanvas() override;
 
-    private:
-        void selectedStreamHasChanged() override;
+private:
+    void selectedStreamHasChanged() override;
 
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Editor);
-    };
-}
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Editor);
+};
+} // namespace PhaseCalculator
 
 #endif // PHASE_CALCULATOR_EDITOR_H_INCLUDED
